@@ -1,5 +1,5 @@
 // In-memory database store for v1 with file-based persistence for development
-import { Project, Chapter, SceneCard, DraftSegment, RevisionTask, RevisionCandidate, VersionRecord, EvaluationIssue, ProjectTag, ProjectCharter, Memory, MemoryType } from '@packages/shared-types';
+import { Project, Chapter, SceneCard, DraftSegment, RevisionTask, RevisionCandidate, VersionRecord, EvaluationIssue, ProjectTag, ProjectCharter, Memory, MemoryType, WritingProgress } from '@packages/shared-types';
 import { loadCollection, saveCollection } from './file-storage';
 
 const COLLECTIONS = {
@@ -14,6 +14,7 @@ const COLLECTIONS = {
   revisions: 'revisions',
   candidates: 'candidates',
   memories: 'memories',
+  progress: 'progress',
 } as const;
 
 // Project store
@@ -699,6 +700,126 @@ class MemoryStore {
   }
 }
 
+// Writing progress store
+class WritingProgressStore {
+  private progress: Map<string, WritingProgress> = new Map();
+  private initialized = false;
+
+  private ensureInitialized(): void {
+    if (this.initialized) return;
+    this.initialized = true;
+    try {
+      const saved = loadCollection<WritingProgress>(COLLECTIONS.progress);
+      saved.forEach((p) => this.progress.set(p.id, p));
+    } catch (error) {
+      console.error('[WritingProgressStore] Failed to load:', error);
+    }
+  }
+
+  private persist(): void {
+    this.ensureInitialized();
+    try {
+      saveCollection(COLLECTIONS.progress, Array.from(this.progress.values()));
+    } catch (error) {
+      console.error('[WritingProgressStore] Failed to persist:', error);
+    }
+  }
+
+  async getByProject(projectId: string): Promise<WritingProgress[]> {
+    this.ensureInitialized();
+    return Array.from(this.progress.values())
+      .filter((p) => p.projectId === projectId)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }
+
+  async upsertDay(projectId: string, date: string, wordsWritten: number, totalWords: number): Promise<WritingProgress> {
+    this.ensureInitialized();
+    const existing = Array.from(this.progress.values()).find(
+      (p) => p.projectId === projectId && p.date === date
+    );
+    if (existing) {
+      const updated = {
+        ...existing,
+        wordsWritten: existing.wordsWritten + wordsWritten,
+        totalWords,
+        updatedAt: new Date(),
+      };
+      this.progress.set(existing.id, updated);
+      this.persist();
+      return updated;
+    }
+    const id = crypto.randomUUID();
+    const newProgress: WritingProgress = {
+      id,
+      projectId,
+      date,
+      wordsWritten,
+      totalWords,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.progress.set(id, newProgress);
+    this.persist();
+    return newProgress;
+  }
+
+  async getStats(projectId: string): Promise<{
+    totalDaysWriting: number;
+    totalWordsWritten: number;
+    averageWordsPerDay: number;
+    currentStreak: number;
+    longestStreak: number;
+  }> {
+    this.ensureInitialized();
+    const projectProgress = await this.getByProject(projectId);
+    if (projectProgress.length === 0) {
+      return { totalDaysWriting: 0, totalWordsWritten: 0, averageWordsPerDay: 0, currentStreak: 0, longestStreak: 0 };
+    }
+
+    const totalDaysWriting = projectProgress.length;
+    const totalWordsWritten = projectProgress.reduce((sum, p) => sum + p.wordsWritten, 0);
+    const averageWordsPerDay = Math.round(totalWordsWritten / totalDaysWriting);
+
+    // Calculate streaks
+    const dates = projectProgress.map((p) => p.date).sort((a, b) => b.localeCompare(a));
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 1;
+
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    if (dates[0] === today || dates[0] === yesterday) {
+      currentStreak = 1;
+      for (let i = 1; i < dates.length; i++) {
+        const prev = new Date(dates[i - 1]);
+        const curr = new Date(dates[i]);
+        const diff = (prev.getTime() - curr.getTime()) / 86400000;
+        if (diff === 1) {
+          currentStreak++;
+        } else {
+          break;
+        }
+      }
+    }
+
+    for (let i = 1; i < dates.length; i++) {
+      const prev = new Date(dates[i - 1]);
+      const curr = new Date(dates[i]);
+      const diff = (prev.getTime() - curr.getTime()) / 86400000;
+      if (diff === 1) {
+        tempStreak++;
+        longestStreak = Math.max(longestStreak, tempStreak);
+      } else {
+        tempStreak = 1;
+      }
+    }
+    longestStreak = Math.max(longestStreak, tempStreak, currentStreak);
+
+    return { totalDaysWriting, totalWordsWritten, averageWordsPerDay, currentStreak, longestStreak };
+  }
+}
+
 // Export singleton instances
 export const projectStore = new ProjectStore();
 export const chapterStore = new ChapterStore();
@@ -709,6 +830,7 @@ export const issueStore = new IssueStore();
 export const revisionStore = new RevisionStore();
 export const revisionCandidateStore = new RevisionCandidateStore();
 export const memoryStore = new MemoryStore();
+export const writingProgressStore = new WritingProgressStore();
 
 // Development seed data - only seeds if storage is empty
 export async function seedDevelopmentData(): Promise<boolean> {

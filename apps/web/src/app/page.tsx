@@ -6,6 +6,7 @@ import { Project } from '@packages/shared-types';
 import { ProjectCard } from '@/components/project/project-card';
 import { CreateProjectModal } from '@/components/project/create-project-modal';
 import { toast } from '@/components/ui/toast';
+import { AuthModal } from '@/components/auth/auth-modal';
 
 const STATUS_FILTERS = [
   { value: 'all', label: '全部' },
@@ -22,8 +23,11 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
 
   const fetchProjects = async () => {
     try {
@@ -37,8 +41,21 @@ export default function DashboardPage() {
     }
   };
 
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      setCurrentUser(data.user);
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+    } finally {
+      setUserLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchCurrentUser();
   }, []);
 
   const handleProjectCreated = (project: Project) => {
@@ -116,14 +133,26 @@ export default function DashboardPage() {
               </svg>
               <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
             </button>
-            <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 rounded-full pr-2 transition-colors">
-              <img
-                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face"
-                alt="User"
-                className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
-              />
-              <span className="text-sm font-medium text-gray-700 pr-2">一叶渡烟岚</span>
-            </div>
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 rounded-full pr-2 transition-colors"
+            >
+              {currentUser ? (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-medium border-2 border-white shadow-sm">
+                    {currentUser.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 pr-2">{currentUser.name}</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 border-2 border-white shadow-sm">
+                    ?
+                  </div>
+                  <span className="text-sm font-medium text-gray-500 pr-2">登录</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       </header>
@@ -131,7 +160,9 @@ export default function DashboardPage() {
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto p-8 max-w-7xl mx-auto w-full">
         <div className="mb-10">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">欢迎回来，一叶渡烟岚</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            {currentUser ? `欢迎回来，${currentUser.name}` : '欢迎来到墨羽'}
+          </h2>
           <p className="text-gray-600">
             今天是个创作的好日子。你目前有{' '}
             <span className="font-semibold text-gray-900">{filteredProjects.length}</span>
@@ -231,6 +262,15 @@ export default function DashboardPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSuccess={handleProjectCreated}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={(user) => {
+          setCurrentUser(user.id ? user : null);
+        }}
       />
     </div>
   );

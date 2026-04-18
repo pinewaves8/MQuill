@@ -1,10 +1,167 @@
 # 项目动态进度（由 Claude 负责维护更新）
 
+---
+
+## 🔄 交接文档（上下文清空前必读）
+
+### 📍 当前 Git 状态
+
+```
+分支：
+- master (root-commit 8b00764) - 初始提交快照
+- develop - 当前开发分支
+
+重要文件：
+- .env.example 已提交（模板，非真实 key）
+- .env 在 .gitignore 中，不会被提交
+```
+
+### 🗂️ 项目结构
+
+```
+c:/tao/MQuill/
+├── apps/web/                 # Next.js 14 主应用
+│   └── src/
+│       ├── app/             # App Router 页面 + API Routes
+│       ├── components/      # React 组件
+│       │   ├── editor/      # TextEditor, VirtualizedEditor, RevisionModal...
+│       │   ├── layout/      # LeftSidebar, ScenePanel, EditorHeader
+│       │   ├── project/     # ProjectCard, CharterPanel, OutlineView
+│       │   ├── version/      # DiffViewer, VersionHistoryDrawer
+│       │   └── ui/          # Toast, TagManager
+│       └── lib/
+│           ├── agents/      # BootstrapAgent, WriterAgent, CriticAgent...
+│           ├── db/          # FileStorage, ProjectsStore (JSON 持久化)
+│           ├── retrieval/   # GroundingPack, LoreRetriever...
+│           ├── state/       # Zustand stores (editor, scene, revision)
+│           └── llm/          # LLM client (OpenAI 兼容)
+├── packages/shared-types/   # TypeScript 类型定义
+└── infra/migrations/        # SQL 迁移文件 (0001-0009)
+```
+
+### ✅ 已完成的核心功能
+
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 项目/章节/场景 CRUD | ✅ | 24 个 API 端点 |
+| 三栏编辑器 | ✅ | 连续模式 + 分段虚拟滚动模式 |
+| 修订流程 | ✅ | RevisionModal + DiffViewer |
+| 版本历史 | ✅ | 比较、恢复、分支 |
+| 评估系统 | ✅ | CriticAgent + EvaluationPanel |
+| 记忆管理 | ✅ | Charter + 5种类型记忆 |
+| Bootstrap Agent | ✅ | 自动生成项目设定 |
+| 3 个 Writer Agent | ✅ | scene-planner/writer/critic |
+| 虚拟滚动 | ✅ | 大章节性能优化 |
+
+### ⚙️ 环境配置
+
+```bash
+# apps/web/.env 需要配置
+OPENAI_API_KEY=your_api_key
+OPENAI_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
+MODEL=qwen-turbo
+
+# 本地开发
+cd apps/web && npm run dev
+```
+
+### 🚫 避坑指南（必须遵守）
+
+1. **API params 必须 await** - Next.js 14 中 `params` 是 Promise
+   ```typescript
+   export async function GET(request: Request, { params }: RouteParams) {
+     const { projectId } = await params; // ❌ 不能省略 await
+   }
+   ```
+
+2. **Zustand openModal 默认值** - 用 `undefined` 而非 `null`
+
+3. **MemoryType 枚举值** - `'canon' | 'world' | 'narrative' | 'style' | 'user'`
+
+4. **z.record() 双参数** - `z.record(z.string(), z.any())`
+
+5. **context 在 useEffect 中使用** - 避免闭包陷阱
+
+6. **Agent 文件位置** - `src/lib/agents/`（不是 `src/app/`）
+
+7. **检索文件位置** - `src/lib/retrieval/`
+
+### 🧱 架构决策记录
+
+| 决策 | 理由 |
+|------|------|
+| JSON 文件持久化 (.data/store.json) | 开发阶段简单，热重载不丢数据 |
+| 分段/连续双编辑器模式 | 满足不同写作习惯 |
+| Bootstrap 在创建项目后自动触发 | AI 全自动模式需要 |
+| Charter + 5种类型记忆 | 支持多维度创作约束 |
+
+### 📦 未完成/可改进项
+
+1. ~~**用户认证**~~ - ✅ 已实现（基础版本）
+2. ~~**富文本格式**~~ - ✅ 已实现（Tiptap 可视化编辑器）
+3. ~~**导出功能**~~ - ✅ 已实现（Markdown/PDF/EPUB）
+4. ~~**写作进度追踪**~~ - ✅ 已实现
+5. **虚拟滚动段落高度估算** - 当前用固定 150px，可优化动态计算
+
+### 🔧 故障排除
+
+- **Bootstrap API 404** - 确认路由在 `[projectId]/route.ts`，不是 `route.ts`
+- **Store 数据丢失** - 确认 `.data/` 目录存在
+- **TypeScript 报错** - 先运行 `npx tsc --noEmit` 检查
+
+### 📝 续记规范
+
+每次开始新会话时：
+1. 先读 `PROGRESS.md` 了解当前状态
+2. 再读 `CLAUDE.md` 了解项目规范
+3. 检查 git 分支：`git branch`（应在 develop）
+
+---
+
+## 📝 最新进度记录（倒序，最新的在最上面）
+
+- **2026-04-18**：完成 MQuill v1 初始提交 + 分支切出
+
 ## 🎯 当前核心目标
 
 - MQuill v1 功能完善阶段，持续优化 UI 和功能
 
 ## 📝 最新进度记录（倒序，最新的在最上面）
+
+- **2026-04-18**：完成用户认证
+  - User 类型定义（packages/shared-types/user.ts）
+  - AuthStore 实现（lib/db/auth-store.ts）- 注册/登录/登出/会话管理
+  - Auth API 路由：/api/auth/login, /api/auth/logout, /api/auth/register, /api/auth/me
+  - AuthModal 组件（components/auth/auth-modal.tsx）- 登录/注册模态框
+  - Dashboard 集成用户状态显示
+  - 核心文件：`lib/db/auth-store.ts`, `app/api/auth/`, `components/auth/auth-modal.tsx`, `app/page.tsx`
+
+- **2026-04-18**：完成写作进度追踪
+  - WritingProgress 类型定义（packages/shared-types/progress.ts）
+  - WritingProgressStore 实现 - 追踪每日写作字数、连续天数、统计数据
+  - Progress API 路由（/api/projects/[projectId]/progress）- 获取/记录写作进度
+  - 项目设置页面显示进度：进度条、目标字数、连续天数、日均字数、写作天数
+  - 核心文件：`packages/shared-types/progress.ts`, `lib/db/projects-store.ts`, `app/api/projects/[projectId]/progress/route.ts`, `app/projects/[projectId]/settings/page.tsx`
+
+- **2026-04-18**：完成导出功能
+  - Export API 路由（/api/export/[projectId]）- 支持 markdown/pdf/epub 三种格式
+  - Markdown 导出 - 直接拼接章节内容
+  - PDF 导出 - 使用 jsPDF 库
+  - EPUB 导出 - 生成标准 EPUB 结构（包含 toc.ncx, content.opf, nav.xhtml）
+  - 项目设置页面添加导出按钮（Markdown/PDF/EPUB）
+  - 核心文件：`app/api/export/[projectId]/route.ts`, `app/projects/[projectId]/settings/page.tsx`
+
+- **2026-04-18**：完成富文本编辑器
+  - 安装 Tiptap 依赖（@tiptap/react, @tiptap/starter-kit, @tiptap/extension-placeholder, @tiptap/extension-highlight）
+  - 创建 `rich-text-editor.tsx` - 基于 Tiptap 的富文本编辑器组件
+  - 实现可视化格式工具栏（FloatingToolbar）：加粗、斜体、二/三级标题、引用、无序列表
+  - 支持 Markdown 快捷键（Ctrl+B 加粗、Ctrl+I 斜体、Ctrl+S 保存）
+  - 选中文本时自动显示格式工具栏
+  - 支持专注模式、自动保存（2秒 debounce）
+  - 保留 markdown 格式存储（与现有 draft_segments 兼容）
+  - 移除 continuous/paragraph 双模式切换，统一使用 RichTextEditor
+  - 清理 editor-header.tsx 中的 editorMode 相关代码
+  - 核心文件：`components/editor/rich-text-editor.tsx`
 
 - **2026-04-18**：完成引导项目 Charter
   - bootstrap-agent.ts：新增引导 Agent，生成项目 Charter 和初始记忆（世界观、人物、风格指南）
@@ -149,17 +306,13 @@
 
 ## 📋 下一步计划
 
-- 完善编辑器富文本功能（字数统计、格式工具栏）✅
-- 接入真实 LLM API（需配置 LLM_API_KEY 环境变量）✅
-- 性能优化（大章节虚拟滚动）✅
-- 添加用户认证（可选）
+- 虚拟滚动段落高度估算优化
+- 其他优化项（待规划）
 
 ## 🆕 最新完成
 
-- **2026-04-18**：完成大章节虚拟滚动性能优化
-  - 新增 `@tanstack/react-virtual` 依赖
-  - 新增 `virtualized-editor.tsx` - 基于段落虚拟滚动的编辑器组件
-  - EditorHeader 新增"连续/分段"模式切换按钮
-  - 分段模式：内容按段落分组，只渲染可见段落，支持点击编辑单个段落
-  - 连续模式：保持原有 textarea 编辑体验
-  - 核心文件：`components/editor/virtualized-editor.tsx`, `components/layout/editor-header.tsx`, `app/projects/[projectId]/editor/page.tsx`
+- **2026-04-18**：完成 MQuill v1 初始提交
+  - 113 files changed, 23535 insertions
+  - master 分支：初始快照；develop 分支：开发分支
+  - 虚拟滚动性能优化（@tanstack/react-virtual）
+  - 双编辑器模式：连续（textarea）和分段（虚拟滚动）

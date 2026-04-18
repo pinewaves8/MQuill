@@ -55,6 +55,22 @@ export default function ProjectSettingsPage() {
   const [targetAudience, setTargetAudience] = useState('');
   const [styleKeywords, setStyleKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Progress tracking
+  const [progressData, setProgressData] = useState<{
+    targetWordCount: number;
+    currentWordCount: number;
+    progress: number;
+    dailyProgress: Array<{ date: string; wordsWritten: number; totalWords: number }>;
+    stats: {
+      totalDaysWriting: number;
+      totalWordsWritten: number;
+      averageWordsPerDay: number;
+      currentStreak: number;
+      longestStreak: number;
+    };
+  } | null>(null);
 
   useEffect(() => {
     const fetchProject = async () => {
@@ -83,6 +99,20 @@ export default function ProjectSettingsPage() {
     };
 
     fetchProject();
+
+    const fetchProgress = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/progress`);
+        if (res.ok) {
+          const data = await res.json();
+          setProgressData(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch progress:', error);
+      }
+    };
+
+    fetchProgress();
   }, [projectId]);
 
   const handleSave = async () => {
@@ -134,6 +164,34 @@ export default function ProjectSettingsPage() {
     setStyleKeywords(styleKeywords.filter((k) => k !== keyword));
   };
 
+  const handleExport = async (format: 'markdown' | 'pdf' | 'epub') => {
+    setIsExporting(true);
+    try {
+      const res = await fetch(`/api/export/${projectId}?format=${format}`);
+      if (res.ok) {
+        const mimeType = format === 'pdf' ? 'application/pdf' : format === 'epub' ? 'application/epub+zip' : 'text/markdown;charset=utf-8';
+        const buffer = await res.arrayBuffer();
+        const blob = new Blob([buffer], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title || 'project'}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        alert(`导出失败: ${errorData.error || res.statusText}`);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('导出失败，请稍后重试');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -143,9 +201,9 @@ export default function ProjectSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
+      <div className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -176,8 +234,9 @@ export default function ProjectSettingsPage() {
         </div>
       </div>
 
-      {/* Form */}
-      <div className="max-w-2xl mx-auto p-6 space-y-6">
+      {/* Form - Scrollable */}
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="max-w-2xl mx-auto p-6 space-y-6">
         {/* Basic Info */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
           <h2 className="font-semibold text-gray-900">基本信息</h2>
@@ -362,6 +421,100 @@ export default function ProjectSettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Writing Progress */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900">写作进度</h2>
+          {progressData ? (
+            <>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">{progressData.currentWordCount.toLocaleString()} 字</span>
+                  <span className="text-gray-600">目标 {progressData.targetWordCount.toLocaleString()} 字</span>
+                </div>
+                <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(progressData.progress, 100)}%` }}
+                  />
+                </div>
+                <div className="text-right text-sm text-gray-500">{progressData.progress}% 完成</div>
+              </div>
+              <div className="grid grid-cols-4 gap-4 pt-2">
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600">{progressData.stats.currentStreak}</div>
+                  <div className="text-xs text-gray-500">当前连续天数</div>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{progressData.stats.longestStreak}</div>
+                  <div className="text-xs text-gray-500">最长连续天数</div>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{progressData.stats.averageWordsPerDay}</div>
+                  <div className="text-xs text-gray-500">日均字数</div>
+                </div>
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <div className="text-2xl font-bold text-orange-600">{progressData.stats.totalDaysWriting}</div>
+                  <div className="text-xs text-gray-500">总写作天数</div>
+                </div>
+              </div>
+              {progressData.dailyProgress.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">最近写作</h3>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {progressData.dailyProgress.map((day) => (
+                      <div key={day.date} className="flex justify-between text-sm py-1 px-2 hover:bg-gray-50 rounded">
+                        <span className="text-gray-600">{day.date}</span>
+                        <span className="text-gray-900 font-medium">+{day.wordsWritten.toLocaleString()} 字</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-sm text-gray-500 py-4 text-center">加载进度数据...</div>
+          )}
+        </div>
+
+        {/* Export */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <h2 className="font-semibold text-gray-900">导出作品</h2>
+          <p className="text-sm text-gray-500">将你的作品导出为不同格式</p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => handleExport('markdown')}
+              disabled={isExporting}
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Markdown
+            </button>
+            <button
+              onClick={() => handleExport('pdf')}
+              disabled={isExporting}
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+              PDF
+            </button>
+            <button
+              onClick={() => handleExport('epub')}
+              disabled={isExporting}
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              EPUB
+            </button>
+          </div>
+        </div>
         </div>
       </div>
     </div>
