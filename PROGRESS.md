@@ -120,15 +120,22 @@ cd apps/web && npm run dev
 
 ## 📝 最新进度记录（倒序，最新的在最上面）
 
-- **2026-04-18**：完成 MQuill v1 初始提交 + 分支切出
+- **2026-04-18**：修复设置页面滚动问题 + PDF 中文导出
+  - 修复 Root layout `overflow-hidden` 封锁滚动的问题
+  - 设置页面改为 `h-screen flex flex-col overflow-hidden` 实现独立滚动
+  - 导出 API 的 `Content-Disposition` header 中文文件名需要 `encodeURIComponent()`
+  - PDF 导出使用 `jsPDF.addFileToVFS()` 嵌入 SimHei 字体解决中文乱码
+  - 提交：`d491ad1`
 
-## 🎯 当前核心目标
+- **2026-04-18**：完成导出功能
+  - Export API 路由（/api/export/[projectId]）- 支持 markdown/pdf/epub 三种格式
+  - Markdown 导出 - 直接拼接章节内容
+  - PDF 导出 - 使用 jsPDF 库（后续修复了中文嵌入问题）
+  - EPUB 导出 - 生成标准 EPUB 结构
+  - 项目设置页面添加导出按钮（Markdown/PDF/EPUB）
+  - 核心文件：`app/api/export/[projectId]/route.ts`
 
-- MQuill v1 功能完善阶段，持续优化 UI 和功能
-
-## 📝 最新进度记录（倒序，最新的在最上面）
-
-- **2026-04-18**：完成用户认证
+- **2026-04-18**：完成写作进度追踪
   - User 类型定义（packages/shared-types/user.ts）
   - AuthStore 实现（lib/db/auth-store.ts）- 注册/登录/登出/会话管理
   - Auth API 路由：/api/auth/login, /api/auth/logout, /api/auth/register, /api/auth/me
@@ -303,6 +310,10 @@ cd apps/web && npm run dev
 - **z.record() 必须双参数** - `z.record(z.string(), z.any())`
 - **MemoryType 枚举值** - 'canon' | 'world' | 'narrative' | 'style' | 'user'
 - **context 参数在 useEffect 中使用** - 避免闭包陷阱
+- **Next.js 开发服务器端口** - 可能不在 3000，检查 `netstat -ano | grep LISTENING | grep 300`
+- **git checkout 会丢失未提交修改** - 重要文件修改后不要随意 checkout
+- **PDF 中文乱码** - jsPDF 默认不支持中文，必须用 `addFileToVFS()` 嵌入 TTF 字体
+- **Root layout overflow-hidden** - 全局 `h-screen overflow-hidden` 会封锁所有页面滚动
 
 ## 📋 下一步计划
 
@@ -310,6 +321,14 @@ cd apps/web && npm run dev
 - 其他优化项（待规划）
 
 ## 🆕 最新完成
+
+- **2026-04-18**：完成富文本编辑器、导出功能和写作进度追踪
+  - 提交：`d491ad1`，18 files changed, 2034 insertions(+)
+  - 富文本编辑器：基于 Tiptap 实现，支持加粗、斜体、标题、引用等格式
+  - 导出功能：Markdown/PDF/EPUB，PDF 嵌入 SimHei 中文字体
+  - 写作进度追踪：目标字数、连续天数、日均字数等统计
+  - 用户认证：登录/注册/登出，cookie session
+  - 核心文件：`rich-text-editor.tsx`, `auth-modal.tsx`, `export/route.ts`, `progress/route.ts`
 
 - **2026-04-18**：完成 MQuill v1 初始提交
   - 113 files changed, 23535 insertions
