@@ -195,6 +195,73 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
     }
   };
 
+  const handleGenerateScenesFromOutline = async () => {
+    if (!chapterId || !projectId) return;
+
+    setIsGenerating(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/scenes/from-outline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapterId }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Add generated scenes to store and refresh
+        data.scenes.forEach((scene: SceneCard) => {
+          addScene(scene);
+        });
+        onRefreshChapters?.();
+        toast.success(`已生成 ${data.count} 个场景`);
+      } else {
+        const error = await res.json();
+        toast.error(error.error || '生成失败，请重试');
+      }
+    } catch (error) {
+      console.error('Failed to generate scenes from outline:', error);
+      toast.error('网络错误，请检查连接');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGenerateAllScenesContent = async () => {
+    if (!chapterId || scenes.length === 0) return;
+
+    setIsGenerating(true);
+    try {
+      const validScenes = scenes.filter(s => s.status !== 'discarded');
+      let successCount = 0;
+
+      for (const scene of validScenes) {
+        const res = await fetch(`/api/scenes/${scene.id}/generate-draft`, {
+          method: 'POST',
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          updateScene(scene.id, data.scene);
+          successCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        onRefreshChapters?.();
+        // Dispatch event to refresh draft segments in editor
+        window.dispatchEvent(new CustomEvent('draft-refresh'));
+        toast.success(`成功生成 ${successCount} 个场景正文`);
+      } else {
+        toast.error('生成失败，请重试');
+      }
+    } catch (error) {
+      console.error('Failed to generate all scenes content:', error);
+      toast.error('网络错误，请检查连接');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleMergeSelect = (sceneId: string) => {
     setSelectedMergeIds((prev) =>
       prev.includes(sceneId)
@@ -323,6 +390,16 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
           <div className="space-y-2">
             <div className="flex gap-2">
               <button
+                onClick={handleGenerateScenesFromOutline}
+                disabled={!chapterId || isGenerating || scenesConfirmed || scenes.length > 0}
+                className="py-2 px-3 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                {isGenerating ? '生成中...' : '生成场景'}
+              </button>
+              <button
                 onClick={handleConfirmScenes}
                 disabled={scenesConfirmed || scenes.filter(s => s.status !== 'discarded').length === 0}
                 className="flex-1 py-2 px-3 bg-gray-900 text-white text-xs font-medium rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -332,30 +409,30 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
                 </svg>
                 {scenesConfirmed ? '已确认' : '确认场景'}
               </button>
-              <button
-                onClick={() => {
-                  // Regenerate all scenes - stub
-                }}
-                className="py-2 px-3 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-100 transition-colors flex items-center justify-center gap-1"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                重新生成
-              </button>
             </div>
 
+            {/* Generate All Content Button */}
             <button
-              onClick={handleAddScene}
-              className="w-full py-2 px-3 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
-              disabled={!chapterId || isCreating}
+              onClick={handleGenerateAllScenesContent}
+              className="w-full py-2 px-3 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!chapterId || scenes.length === 0 || !scenesConfirmed}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
               </svg>
-              新增场景
+              一键生成所有场景正文
             </button>
           </div>
+
+          {/* Scene Status Locked Message */}
+          {scenesConfirmed && (
+            <div className="mt-3 text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              场景已锁定，可基于场景生成正文
+            </div>
+          )}
         </div>
 
         {/* Scene List with DnD */}

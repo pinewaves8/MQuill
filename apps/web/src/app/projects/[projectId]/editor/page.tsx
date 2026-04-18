@@ -156,6 +156,27 @@ export default function EditorPage() {
     };
   }, [setChapters]);
 
+  // Listen for draft refresh event from scene panel
+  useEffect(() => {
+    const handleDraftRefresh = async () => {
+      if (currentChapter) {
+        try {
+          const res = await fetch(`/api/chapters/${currentChapter.id}/draft`);
+          if (res.ok) {
+            const data = await res.json();
+            setDraftSegments(data.segments || []);
+          }
+        } catch (error) {
+          console.error('Failed to fetch draft:', error);
+        }
+      }
+    };
+    window.addEventListener('draft-refresh', handleDraftRefresh as EventListener);
+    return () => {
+      window.removeEventListener('draft-refresh', handleDraftRefresh as EventListener);
+    };
+  }, [currentChapter?.id, setDraftSegments]);
+
   // Handle "AI修订本章" button
   const handleReviseChapter = (content: string) => {
     openModal(content, undefined, 'chapter');

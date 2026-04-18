@@ -20,7 +20,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-white text-gray-800 selection:bg-gray-200 selection:text-gray-900">
+      <body className="h-screen min-h-screen bg-white text-gray-800 selection:bg-gray-200 selection:text-gray-900">
         {children}
         <ToastProvider />
       </body>
