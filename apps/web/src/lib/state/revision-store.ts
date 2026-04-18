@@ -1,0 +1,95 @@
+import { create } from 'zustand';
+import { RevisionTask, RevisionCandidate } from '@packages/shared-types';
+
+interface RevisionState {
+  // Modal state
+  isModalOpen: boolean;
+  isReviewing: boolean;
+
+  // Selection
+  selectedText: string;
+  selectionRange: { start: number; end: number } | null;
+
+  // Revision task
+  currentRevision: RevisionTask | null;
+  candidates: RevisionCandidate[];
+  currentCandidateIndex: number;
+
+  // Form inputs
+  suggestion: string;
+  goals: string[];
+  constraints: string[];
+  applyMode: 'replace' | 'append' | 'branch';
+
+  // Actions
+  openModal: (selectedText?: string, range?: { start: number; end: number }) => void;
+  closeModal: () => void;
+  setSelectedText: (text: string) => void;
+  setSelectionRange: (range: { start: number; end: number } | null) => void;
+  setCurrentRevision: (revision: RevisionTask | null) => void;
+  setCandidates: (candidates: RevisionCandidate[]) => void;
+  addCandidate: (candidate: RevisionCandidate) => void;
+  setCurrentCandidateIndex: (index: number) => void;
+  setSuggestion: (suggestion: string) => void;
+  setGoals: (goals: string[]) => void;
+  setConstraints: (constraints: string[]) => void;
+  setApplyMode: (mode: 'replace' | 'append' | 'branch') => void;
+  setIsReviewing: (isReviewing: boolean) => void;
+  reset: () => void;
+}
+
+const initialState = {
+  isModalOpen: false,
+  isReviewing: false,
+  selectedText: '',
+  selectionRange: null,
+  currentRevision: null,
+  candidates: [],
+  currentCandidateIndex: -1,
+  suggestion: '',
+  goals: [],
+  constraints: [],
+  applyMode: 'replace' as const,
+};
+
+export const useRevisionStore = create<RevisionState>()((set) => ({
+  ...initialState,
+
+  openModal: (selectedText = '', range = undefined) =>
+    set({
+      isModalOpen: true,
+      selectedText,
+      selectionRange: range,
+    }),
+
+  closeModal: () => set(initialState),
+
+  setSelectedText: (selectedText) => set({ selectedText }),
+
+  setSelectionRange: (selectionRange) => set({ selectionRange }),
+
+  setCurrentRevision: (currentRevision) => set({ currentRevision }),
+
+  setCandidates: (candidates) => set({ candidates }),
+
+  addCandidate: (candidate) =>
+    set((state) => ({
+      candidates: [...state.candidates, candidate],
+      currentCandidateIndex: state.candidates.length,
+    })),
+
+  setCurrentCandidateIndex: (currentCandidateIndex) =>
+    set({ currentCandidateIndex }),
+
+  setSuggestion: (suggestion) => set({ suggestion }),
+
+  setGoals: (goals) => set({ goals }),
+
+  setConstraints: (constraints) => set({ constraints }),
+
+  setApplyMode: (applyMode) => set({ applyMode }),
+
+  setIsReviewing: (isReviewing) => set({ isReviewing }),
+
+  reset: () => set(initialState),
+}));
