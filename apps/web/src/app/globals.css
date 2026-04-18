@@ -112,6 +112,31 @@
   display: none;
 }
 
+.scene-panel-collapsed-bar {
+  display: none;
+  height: 100%;
+  width: 48px;
+  border-right: 1px solid #e5e7eb;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.scene-panel.collapsed .scene-panel-collapsed-bar {
+  display: flex;
+}
+
+.scene-panel-collapsed-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
 /* Version card */
 .version-card.active-compare {
   border-color: #111827;

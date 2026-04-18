@@ -302,26 +302,31 @@ export function RichTextEditor({ chapter, segments, onSegmentsChange, onChapterU
           const html = currentEditor.getHTML();
           const content = htmlToContent(html);
 
+          // If content is empty, send empty array to clear all segments
+          // Otherwise, send all segments with segmentIndex: 0 updated
+          const allSegments = content.trim() === ''
+            ? []
+            : segments.length === 0
+              ? [{ segmentIndex: 0, content, source: DRAFT_SOURCE, isLocked: false }]
+              : segments.map((seg, idx) =>
+                  idx === 0
+                    ? { ...seg, content, source: DRAFT_SOURCE, isLocked: false }
+                    : seg
+                );
+
           const res = await fetch(`/api/chapters/${currentChapter.id}/draft`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chapterId: currentChapter.id,
-              segments: [
-                {
-                  segmentIndex: 0,
-                  content,
-                  source: DRAFT_SOURCE,
-                  isLocked: false,
-                },
-              ],
+              segments: allSegments,
             }),
           });
 
           if (res.ok) {
             const data = await res.json();
             onSegmentsChange(data.segments);
-            const wordCount = content.length;
+            const wordCount = data.segments.reduce((sum: number, s: { content: string }) => sum + s.content.length, 0);
             onChapterUpdate?.({ ...currentChapter, title: currentTitle, wordCount });
             setLastSaved(new Date());
             setIsDirty(false);
@@ -358,26 +363,31 @@ export function RichTextEditor({ chapter, segments, onSegmentsChange, onChapterU
       const html = editor.getHTML();
       const content = htmlToContent(html);
 
+      // If content is empty, send empty array to clear all segments
+      // Otherwise, send all segments with segmentIndex: 0 updated
+      const allSegments = content.trim() === ''
+        ? []
+        : segments.length === 0
+          ? [{ segmentIndex: 0, content, source: DRAFT_SOURCE, isLocked: false }]
+          : segments.map((seg, idx) =>
+              idx === 0
+                ? { ...seg, content, source: DRAFT_SOURCE, isLocked: false }
+                : seg
+            );
+
       const res = await fetch(`/api/chapters/${chapter.id}/draft`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           chapterId: chapter.id,
-          segments: [
-            {
-              segmentIndex: 0,
-              content,
-              source: DRAFT_SOURCE,
-              isLocked: false,
-            },
-          ],
+          segments: allSegments,
         }),
       });
 
       if (res.ok) {
         const data = await res.json();
         onSegmentsChange(data.segments);
-        const wordCount = content.length;
+        const wordCount = data.segments.reduce((sum: number, s: { content: string }) => sum + s.content.length, 0);
         onChapterUpdate?.({ ...chapter!, title, wordCount });
         setLastSaved(new Date());
         setIsDirty(false);
@@ -388,7 +398,7 @@ export function RichTextEditor({ chapter, segments, onSegmentsChange, onChapterU
     } finally {
       setIsSaving(false);
     }
-  }, [chapter, editor, title, isTitleDirty, onSegmentsChange, onChapterUpdate]);
+  }, [chapter, editor, title, isTitleDirty, segments, onSegmentsChange, onChapterUpdate]);
 
   const handleTitleChange = useCallback((newTitle: string) => {
     setTitle(newTitle);

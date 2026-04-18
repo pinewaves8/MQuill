@@ -7,8 +7,7 @@ import { useSceneStore } from '@/lib/state/scene-store';
 import { LeftSidebar } from '@/components/layout/left-sidebar';
 import { ScenePanel } from '@/components/layout/scene-panel';
 import { EditorHeader } from '@/components/layout/editor-header';
-import { TextEditor } from '@/components/editor/text-editor';
-import { VirtualizedEditor } from '@/components/editor/virtualized-editor';
+import { RichTextEditor } from '@/components/editor/rich-text-editor';
 import { RevisionModal } from '@/components/editor/revision-modal';
 import { SelectionToolbar } from '@/components/editor/selection-toolbar';
 import { EvaluationPanel } from '@/components/editor/evaluation-panel';
@@ -16,8 +15,6 @@ import { ProjectOverview } from '@/components/project/project-overview';
 import { OutlineView } from '@/components/project/outline-view';
 import { VersionHistoryDrawer } from '@/components/version/version-history-drawer';
 import { useRevisionStore } from '@/lib/state/revision-store';
-
-type EditorMode = 'continuous' | 'paragraph';
 
 export default function EditorPage() {
   const params = useParams();
@@ -39,7 +36,8 @@ export default function EditorPage() {
 
   const { setScenes, scenes } = useSceneStore();
   const [refreshKey, setRefreshKey] = useState(0);
-  const { isModalOpen } = useRevisionStore();
+  const { isModalOpen, openModal } = useRevisionStore();
+  const [isModalHydrated, setIsModalHydrated] = useState(false);
   const [leftTab, setLeftTab] = useState<'chapters' | 'outline' | 'versions' | 'evaluation'>(
     () => {
       const tab = searchParams.get('tab');
@@ -51,7 +49,6 @@ export default function EditorPage() {
   );
   const [showEvaluation, setShowEvaluation] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-  const [editorMode, setEditorMode] = useState<EditorMode>('continuous');
 
   // Handle evaluation tab
   useEffect(() => {
@@ -66,6 +63,11 @@ export default function EditorPage() {
       setShowVersionHistory(true);
     }
   }, [leftTab]);
+
+  // Ensure modal only renders after hydration to prevent flicker
+  useEffect(() => {
+    setIsModalHydrated(true);
+  }, []);
 
   // Fetch project and chapters
   useEffect(() => {
@@ -154,6 +156,14 @@ export default function EditorPage() {
     };
   }, [setChapters]);
 
+  // Handle "AI修订本章" button
+  const handleReviseChapter = (content: string) => {
+    openModal(content, undefined, 'chapter');
+  };
+
+  // Chapter content for revision
+  const chapterContent = draftSegments.map((s) => s.content).join('\n\n');
+
   return (
     <div className="h-full flex bg-gray-50">
       {/* Left Sidebar */}
@@ -202,38 +212,25 @@ export default function EditorPage() {
               project={project}
               chapter={currentChapter}
               wordCount={draftSegments.reduce((sum, seg) => sum + seg.content.length, 0)}
-              editorMode={editorMode}
-              onEditorModeChange={setEditorMode}
+              chapterContent={chapterContent}
+              onReviseChapter={handleReviseChapter}
             />
 
-            {editorMode === 'paragraph' ? (
-              <VirtualizedEditor
-                chapter={currentChapter}
-                segments={draftSegments}
-                onSegmentsChange={setDraftSegments}
-                onChapterUpdate={(updated) => {
-                  setChapters(chapters.map(c => c.id === updated.id ? updated : c));
-                  setCurrentChapter(updated);
-                }}
-              />
-            ) : (
-              <TextEditor
-                chapter={currentChapter}
-                segments={draftSegments}
-                onSegmentsChange={setDraftSegments}
-                onChapterUpdate={(updated) => {
-                  // Update chapters list with new title
-                  setChapters(chapters.map(c => c.id === updated.id ? updated : c));
-                  setCurrentChapter(updated);
-                }}
-              />
-            )}
+            <RichTextEditor
+              chapter={currentChapter}
+              segments={draftSegments}
+              onSegmentsChange={setDraftSegments}
+              onChapterUpdate={(updated) => {
+                setChapters(chapters.map(c => c.id === updated.id ? updated : c));
+                setCurrentChapter(updated);
+              }}
+            />
           </>
         )}
       </main>
 
       {/* Revision Modal */}
-      {isModalOpen && <RevisionModal />}
+      {isModalHydrated && isModalOpen && <RevisionModal />}
 
       {/* Selection Toolbar */}
       <SelectionToolbar />

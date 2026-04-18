@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRevisionStore } from '@/lib/state/revision-store';
+import { getSelectedTextFromEditor } from '@/lib/editor-utils';
 
 export function SelectionToolbar() {
   const { selectedText, isModalOpen, openModal, setSelectedText, setSelectionRange } = useRevisionStore();
@@ -44,16 +45,17 @@ export function SelectionToolbar() {
   }, []);
 
   const handleOpenRevision = () => {
-    const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
-    if (textarea) {
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const text = textarea.value.substring(start, end);
-      setSelectedText(text);
-      setSelectionRange({ start, end });
-    }
-    openModal(selectedText);
-    setIsVisible(false);
+    requestAnimationFrame(() => {
+      const selection = getSelectedTextFromEditor();
+      if (selection) {
+        setSelectedText(selection.text);
+        setSelectionRange({ start: selection.start, end: selection.end });
+        openModal(selection.text, { start: selection.start, end: selection.end }, 'selection');
+      } else {
+        openModal(selectedText, undefined, 'selection');
+      }
+      setIsVisible(false);
+    });
   };
 
   if (!isVisible || isModalOpen) return null;

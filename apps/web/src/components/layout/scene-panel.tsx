@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   DndContext,
   closestCenter,
@@ -43,6 +43,7 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
     removeScene,
   } = useSceneStore();
 
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editingScene, setEditingScene] = useState<SceneCard | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -51,6 +52,7 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
   const [selectedMergeIds, setSelectedMergeIds] = useState<string[]>([]);
   const [scenesConfirmed, setScenesConfirmed] = useState(false);
 
+  // Sensors must be declared before any early returns (hooks rule)
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -61,6 +63,20 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Wait for store hydration before rendering
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Don't render until hydrated to prevent flash
+  if (!isHydrated) {
+    return (
+      <aside className="w-[320px] min-w-[320px] bg-gray-50 border-r border-gray-200 flex items-center justify-center">
+        <div className="text-xs text-gray-400">加载中...</div>
+      </aside>
+    );
+  }
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveSceneId(event.active.id as string);

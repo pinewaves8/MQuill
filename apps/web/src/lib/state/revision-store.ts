@@ -9,6 +9,7 @@ interface RevisionState {
   // Selection
   selectedText: string;
   selectionRange: { start: number; end: number } | null;
+  targetScope: 'selection' | 'segment' | 'chapter';
 
   // Revision task
   currentRevision: RevisionTask | null;
@@ -16,21 +17,22 @@ interface RevisionState {
   currentCandidateIndex: number;
 
   // Form inputs
-  suggestion: string;
+  suggestions: string[];
   goals: string[];
   constraints: string[];
   applyMode: 'replace' | 'append' | 'branch';
 
   // Actions
-  openModal: (selectedText?: string, range?: { start: number; end: number }) => void;
+  openModal: (selectedText?: string, range?: { start: number; end: number }, targetScope?: 'selection' | 'segment' | 'chapter') => void;
   closeModal: () => void;
   setSelectedText: (text: string) => void;
   setSelectionRange: (range: { start: number; end: number } | null) => void;
+  setTargetScope: (scope: 'selection' | 'segment' | 'chapter') => void;
   setCurrentRevision: (revision: RevisionTask | null) => void;
   setCandidates: (candidates: RevisionCandidate[]) => void;
   addCandidate: (candidate: RevisionCandidate) => void;
   setCurrentCandidateIndex: (index: number) => void;
-  setSuggestion: (suggestion: string) => void;
+  setSuggestions: (suggestions: string[]) => void;
   setGoals: (goals: string[]) => void;
   setConstraints: (constraints: string[]) => void;
   setApplyMode: (mode: 'replace' | 'append' | 'branch') => void;
@@ -43,10 +45,11 @@ const initialState = {
   isReviewing: false,
   selectedText: '',
   selectionRange: null,
+  targetScope: 'selection' as const,
   currentRevision: null,
   candidates: [],
   currentCandidateIndex: -1,
-  suggestion: '',
+  suggestions: [],
   goals: [],
   constraints: [],
   applyMode: 'replace' as const,
@@ -55,11 +58,12 @@ const initialState = {
 export const useRevisionStore = create<RevisionState>()((set) => ({
   ...initialState,
 
-  openModal: (selectedText = '', range = undefined) =>
+  openModal: (selectedText = '', range = undefined, targetScope = 'selection') =>
     set({
       isModalOpen: true,
       selectedText,
       selectionRange: range,
+      targetScope,
     }),
 
   closeModal: () => set(initialState),
@@ -67,6 +71,8 @@ export const useRevisionStore = create<RevisionState>()((set) => ({
   setSelectedText: (selectedText) => set({ selectedText }),
 
   setSelectionRange: (selectionRange) => set({ selectionRange }),
+
+  setTargetScope: (targetScope) => set({ targetScope }),
 
   setCurrentRevision: (currentRevision) => set({ currentRevision }),
 
@@ -81,7 +87,7 @@ export const useRevisionStore = create<RevisionState>()((set) => ({
   setCurrentCandidateIndex: (currentCandidateIndex) =>
     set({ currentCandidateIndex }),
 
-  setSuggestion: (suggestion) => set({ suggestion }),
+  setSuggestions: (suggestions) => set({ suggestions }),
 
   setGoals: (goals) => set({ goals }),
 

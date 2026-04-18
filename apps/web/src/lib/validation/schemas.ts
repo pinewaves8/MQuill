@@ -81,6 +81,7 @@ export const CreateRevisionSchema = z.object({
   chapterId: z.string().uuid(),
   targetScope: z.enum(['selection', 'segment', 'chapter']).default('selection'),
   targetRefId: z.string().uuid().optional(),
+  originalText: z.string().optional(),
   suggestion: z.string().min(1),
   goals: z.array(z.string()).optional(),
   constraints: z.array(z.string()).optional(),

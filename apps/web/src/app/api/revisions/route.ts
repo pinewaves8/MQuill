@@ -64,6 +64,7 @@ export async function POST(request: Request) {
       chapterId: input.chapterId,
       targetScope: input.targetScope,
       targetRefId: input.targetRefId,
+      originalText: input.originalText,
       suggestion: input.suggestion,
       goals: input.goals || [],
       constraints: input.constraints || [],

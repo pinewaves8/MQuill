@@ -9,6 +9,7 @@ export interface RevisionTask {
   chapterId: string;
   targetScope: RevisionTargetScope;
   targetRefId?: string;
+  originalText?: string;  // The selected text for revision
   suggestion: string;
   goals: string[];
   constraints: string[];
@@ -47,6 +48,7 @@ export interface CreateRevisionInput {
   chapterId: string;
   targetScope: RevisionTargetScope;
   targetRefId?: string;
+  originalText?: string;  // The selected text for revision
   suggestion: string;
   goals?: string[];
   constraints?: string[];

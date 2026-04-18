@@ -38,3 +38,30 @@ export interface SaveDraftInput {
   chapterId: string;
   segments: DraftSegment[];
 }
+
+// Book Outline types
+export interface VolumeOutline {
+  id: string;
+  title: string;
+  goal: string;
+  conflict: string;
+  result: string;
+  color: string;
+  chapters: ChapterOutline[];
+}
+
+export interface ChapterOutline {
+  id: string;
+  title: string;
+  chapterGoal: string;
+  mainEvents: string;
+  characterProgress: string;
+  hook: string;
+}
+
+export interface BookOutline {
+  projectId: string;
+  volumes: VolumeOutline[];
+  createdAt: Date;
+  updatedAt: Date;
+}

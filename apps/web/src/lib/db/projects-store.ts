@@ -363,6 +363,34 @@ class DraftSegmentStore {
     this.ensureInitialized();
     return this.segments.get(id) || null;
   }
+
+  async deleteByChapter(chapterId: string): Promise<void> {
+    this.ensureInitialized();
+    const toDelete = Array.from(this.segments.values())
+      .filter((s) => s.chapterId === chapterId)
+      .map((s) => s.id);
+    for (const id of toDelete) {
+      this.segments.delete(id);
+    }
+    this.persist();
+  }
+
+  async deleteById(id: string): Promise<void> {
+    this.ensureInitialized();
+    this.segments.delete(id);
+    this.persist();
+  }
+
+  async deleteExcluding(chapterId: string, keepIds: Set<string>): Promise<void> {
+    this.ensureInitialized();
+    const toDelete = Array.from(this.segments.values())
+      .filter((s) => s.chapterId === chapterId && !keepIds.has(s.id) && !s.isLocked)
+      .map((s) => s.id);
+    for (const id of toDelete) {
+      this.segments.delete(id);
+    }
+    this.persist();
+  }
 }
 
 // Version store

@@ -71,27 +71,47 @@ export async function PUT(
       );
     }
 
-    // Upsert each segment
     const projectId = chapter.projectId;
-    for (const seg of result.data.segments) {
-      if (seg.id) {
-        // Update existing segment
-        await draftSegmentStore.update(seg.id, {
-          content: seg.content,
-          source: seg.source,
-          isLocked: seg.isLocked,
-        });
-      } else {
-        // Create new segment
-        await draftSegmentStore.upsert({
-          projectId,
-          chapterId,
-          sceneId: seg.sceneId,
-          segmentIndex: seg.segmentIndex,
-          content: seg.content,
-          source: seg.source,
-          isLocked: seg.isLocked,
-        });
+
+    // If segments array is empty, clear all segments for this chapter
+    if (result.data.segments.length === 0) {
+      await draftSegmentStore.deleteByChapter(chapterId);
+    } else {
+      // Collect IDs of segments being saved
+      const sentIds = new Set<string>();
+      for (const seg of result.data.segments) {
+        if (seg.id) sentIds.add(seg.id);
+      }
+
+      // Delete segments not in the sent list (except locked ones)
+      const existingSegments = await draftSegmentStore.getByChapter(chapterId);
+      for (const seg of existingSegments) {
+        if (!sentIds.has(seg.id) && !seg.isLocked) {
+          await draftSegmentStore.deleteById(seg.id);
+        }
+      }
+
+      // Upsert each segment
+      for (const seg of result.data.segments) {
+        if (seg.id) {
+          // Update existing segment
+          await draftSegmentStore.update(seg.id, {
+            content: seg.content,
+            source: seg.source,
+            isLocked: seg.isLocked,
+          });
+        } else {
+          // Create new segment
+          await draftSegmentStore.upsert({
+            projectId,
+            chapterId,
+            sceneId: seg.sceneId,
+            segmentIndex: seg.segmentIndex,
+            content: seg.content,
+            source: seg.source,
+            isLocked: seg.isLocked,
+          });
+        }
       }
     }
 
