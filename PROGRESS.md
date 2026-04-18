@@ -120,6 +120,15 @@ cd apps/web && npm run dev
 
 ## 📝 最新进度记录（倒序，最新的在最上面）
 
+- **2026-04-18**：接通 repair-agent + 修订流程
+  - 创建 `lib/agents/repair-agent.ts` - 实现真正的 AI 修订代理
+  - 修订代理接收 revision task + 原文 + grounding pack，生成改进版本
+  - 支持 applyMode（replace/append/branch）指令
+  - 强制遵守 constraints 约束，参考 style/lore/narrative 上下文
+  - 更新 `api/revisions/[revisionId]/run/route.ts` - 替换 stub 为真实 AI 调用
+  - 移除 2 秒模拟延迟，改为真实 LLM 调用
+  - 核心文件：`lib/agents/repair-agent.ts`, `app/api/revisions/[revisionId]/run/route.ts`
+
 - **2026-04-18**：修复设置页面滚动问题 + PDF 中文导出
   - 修复 Root layout `overflow-hidden` 封锁滚动的问题
   - 设置页面改为 `h-screen flex flex-col overflow-hidden` 实现独立滚动
@@ -321,6 +330,26 @@ cd apps/web && npm run dev
 - 其他优化项（待规划）
 
 ## 🆕 最新完成
+
+- **2026-04-19**：完成全自动小说生成链条 + AI场景助手对齐
+  - 提交：`2b80727`，5 files changed, 394 insertions(+)
+  - **全自动生成链条打通**：
+    - 创建测试脚本 `scripts/generate-novel.ts` - 端到端测试完整流程
+    - 修复 `/api/agents/outline` 不保存大纲的 bug（现改为生成后自动保存）
+    - 修复 `/api/projects/:id/scenes/from-outline` 章节标题匹配问题（支持"第一章"匹配"第一章：虫洞之外"）
+    - 添加 `outlines` 到 `file-storage.ts` 的 StoreData 接口
+    - **测试结果**：成功生成约24,000字短篇小说《星际迷途》，2卷12章，39个场景，耗时4分钟
+  - **AI场景助手对齐 c_modified_v17.html**：
+    - "新增场景"按钮 → "一键生成所有场景正文"（紫色按钮）
+    - "重新生成"按钮 → "生成场景"（根据大纲章节信息生成2-3个场景）
+    - 添加场景锁定状态提示
+    - 生成正文后触发 `draft-refresh` 事件实时刷新编辑器
+  - **侧边栏三段式布局**：
+    - Header（返回按钮+项目信息）- 固定顶部
+    - Navigation+目录 - 可滚动，目录头 sticky
+    - User（作者信息）- 固定底部
+    - `overflow-hidden` 防止撑开，结构更稳定
+  - 核心文件：`scripts/generate-novel.ts`, `api/agents/outline/route.ts`, `api/projects/:id/scenes/from-outline/route.ts`, `left-sidebar.tsx`, `scene-panel.tsx`, `file-storage.ts`
 
 - **2026-04-18**：完成富文本编辑器、导出功能和写作进度追踪
   - 提交：`d491ad1`，18 files changed, 2034 insertions(+)

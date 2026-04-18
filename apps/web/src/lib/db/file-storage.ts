@@ -21,6 +21,7 @@ interface StoreData {
   revisions: unknown[];
   candidates: unknown[];
   memories: unknown[];
+  outlines: unknown[];
 }
 
 // Ensure data directory exists
@@ -78,6 +79,7 @@ function getEmptyStore(): StoreData {
     revisions: [],
     candidates: [],
     memories: [],
+    outlines: [],
   };
 }
 

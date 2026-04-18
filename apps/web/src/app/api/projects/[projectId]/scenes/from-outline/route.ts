@@ -41,10 +41,12 @@ export async function POST(
       return NextResponse.json({ error: 'Outline not found' }, { status: 404 });
     }
 
-    // Find the chapter outline data by matching title
+    // Find the chapter outline data by matching title (partial match for titles like "第一章" matching "第一章：虫洞之外")
     let chapterOutline: ChapterOutline | undefined;
     for (const volume of outline.volumes) {
-      chapterOutline = volume.chapters.find(c => c.title === chapter.title);
+      chapterOutline = volume.chapters.find(c =>
+        c.title === chapter.title || c.title.startsWith(chapter.title + '：') || c.title.startsWith(chapter.title + ':')
+      );
       if (chapterOutline) break;
     }
 

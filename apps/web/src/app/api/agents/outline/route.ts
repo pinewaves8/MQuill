@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { projectStore, chapterStore } from '@/lib/db/projects-store';
-import { loadCollection } from '@/lib/db/file-storage';
-import { ProjectCharter } from '@packages/shared-types';
+import { loadCollection, saveCollection } from '@/lib/db/file-storage';
+import { ProjectCharter, BookOutline } from '@packages/shared-types';
 import { outlineAgent } from '@/lib/agents/outline-agent';
 
 export async function POST(request: Request) {
@@ -23,9 +23,26 @@ export async function POST(request: Request) {
 
     const outline = await outlineAgent(project, charter);
 
-    // Optionally create chapters based on outline
-    // For now, just return the outline
-    return NextResponse.json({ outline });
+    // Save outline to storage
+    const outlines = loadCollection<BookOutline>('outlines');
+    const existingIndex = outlines.findIndex(o => o.projectId === projectId);
+
+    const bookOutline: BookOutline = {
+      projectId,
+      volumes: outline.volumes,
+      createdAt: existingIndex >= 0 ? outlines[existingIndex].createdAt : new Date(),
+      updatedAt: new Date(),
+    };
+
+    if (existingIndex >= 0) {
+      outlines[existingIndex] = bookOutline;
+    } else {
+      outlines.push(bookOutline);
+    }
+
+    saveCollection('outlines', outlines);
+
+    return NextResponse.json({ outline: bookOutline });
   } catch (error) {
     console.error('Error generating outline:', error);
     return NextResponse.json({ error: 'Failed to generate outline' }, { status: 500 });
