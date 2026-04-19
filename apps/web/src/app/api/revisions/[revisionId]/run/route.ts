@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revisionStore, revisionCandidateStore, draftSegmentStore } from '@/lib/db/projects-store';
+import { revisionStore, revisionCandidateStore, draftSegmentStore, issueStore } from '@/lib/db/projects-store';
 import { repairAgent } from '@/lib/agents/repair-agent';
 
 interface RouteParams {
@@ -75,6 +75,11 @@ export async function POST(
     // Update revision status to reviewed
     await revisionStore.update(revisionId, { status: 'reviewed' });
 
+    // Auto-mark linked issues as fixed once the revision has been generated.
+    if (revision.linkedIssueId) {
+      await issueStore.update(revision.linkedIssueId, { status: 'fixed' });
+    }
+
     return NextResponse.json({
       data: {
         candidate,
@@ -84,6 +89,10 @@ export async function POST(
   } catch (error) {
     console.error('Error running revision:', error);
     await revisionStore.update(revisionId, { status: 'draft' });
+    const revision = await revisionStore.getById(revisionId);
+    if (revision?.linkedIssueId) {
+      await issueStore.update(revision.linkedIssueId, { status: 'open' });
+    }
     return NextResponse.json(
       { error: 'Failed to run revision' },
       { status: 500 }

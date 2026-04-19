@@ -95,6 +95,7 @@ export function RevisionModal() {
   const {
     selectedText,
     targetScope,
+    currentRevision,
     suggestions,
     suggestionText,
     goals,
@@ -187,6 +188,9 @@ export function RevisionModal() {
     setError(null);
 
     try {
+      let revision = currentRevision;
+
+      if (!revision) {
       const createRes = await fetch('/api/revisions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -208,7 +212,8 @@ export function RevisionModal() {
       }
 
       const createPayload = await createRes.json();
-      const revision = createPayload.data?.revision;
+      revision = createPayload.data?.revision;
+      }
 
       if (!revision) {
         throw new Error('淇浠诲姟杩斿洖鏃犳晥');

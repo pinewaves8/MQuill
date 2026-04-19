@@ -156,6 +156,35 @@ export function EvaluationPanel({ chapterId, projectId, chapterTitle, isOpen, on
   const handleDirectRevision = async (issueId: string) => {
     const issue = issues.find((i) => i.id === issueId);
     if (!issue) return;
+
+    try {
+      const res = await fetch(`/api/issues/${issueId}/create-revision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      if (res.ok) {
+        const payload = await res.json();
+        const revision = payload.data?.revision;
+        const updatedIssue = payload.data?.issue;
+        const { setCurrentRevision, setSuggestions, setSuggestionText } = useRevisionStore.getState();
+
+        if (revision) {
+          setCurrentRevision(revision);
+        }
+        if (updatedIssue) {
+          setIssues((prev) => prev.map((item) => (item.id === issueId ? updatedIssue : item)));
+        }
+        if (issue.suggestion) {
+          setSuggestions([issue.suggestion]);
+          setSuggestionText(issue.suggestion);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create linked revision:', error);
+    }
+
     setSelectedText(issue.excerpt || '');
     openModal(issue.excerpt || '');
     onClose();

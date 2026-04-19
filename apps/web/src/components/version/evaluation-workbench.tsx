@@ -76,7 +76,7 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
   const [isLoading, setIsLoading] = useState(true);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [filterTag, setFilterTag] = useState<string>('all');
-  const [openOnly, setOpenOnly] = useState(false);
+  const [openOnly, setOpenOnly] = useState(true);
   const [sortMode, setSortMode] = useState<string>('priority');
   const [traceExpanded, setTraceExpanded] = useState(false);
   const { openModal, setSelectedText } = useRevisionStore();
@@ -171,6 +171,7 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
   const handleDirectRevision = async (issueId: string) => {
     const issue = issues.find((i) => i.id === issueId);
     if (!issue) return;
+
     const revision = revisions.find((r) => r.linkedIssueId === issueId);
 
     // If we have a revision, pre-populate from it
@@ -213,6 +214,33 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
       } catch (error) {
         console.error('Failed to fetch revision:', error);
       }
+    }
+
+    try {
+      const createRes = await fetch(`/api/issues/${issueId}/create-revision`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (createRes.ok) {
+        const payload = await createRes.json();
+        const createdRevision = payload.data?.revision;
+        const updatedIssue = payload.data?.issue;
+        const { setCurrentRevision, setSuggestions, setSuggestionText } = useRevisionStore.getState();
+
+        if (createdRevision) {
+          setCurrentRevision(createdRevision);
+        }
+        if (updatedIssue) {
+          setIssues((prev) => prev.map((item) => (item.id === issueId ? updatedIssue : item)));
+        }
+        if (issue.suggestion) {
+          setSuggestions([issue.suggestion]);
+          setSuggestionText(issue.suggestion);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to create linked revision:', error);
     }
 
     // Fallback: open modal with issue suggestion
