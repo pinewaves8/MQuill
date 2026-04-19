@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Chapter, EvaluationIssue, EvaluationMetrics, IssueTag } from '@packages/shared-types';
+import { Chapter, EvaluationIssue, EvaluationMetrics, IssueTag, RevisionTask } from '@packages/shared-types';
 import { useRevisionStore } from '@/lib/state/revision-store';
 
 interface EvaluationWorkbenchProps {
@@ -71,6 +71,7 @@ const STATUS_META: Record<string, { label: string; classes: string }> = {
 export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClose }: EvaluationWorkbenchProps) {
   const [selectedChapterId, setSelectedChapterId] = useState<string | null>(currentChapter?.id || null);
   const [issues, setIssues] = useState<EvaluationIssue[]>([]);
+  const [revisions, setRevisions] = useState<RevisionTask[]>([]);
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEvaluating, setIsEvaluating] = useState(false);
@@ -102,10 +103,18 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
   const fetchIssues = async (chapterId: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/issues?chapterId=${chapterId}`);
-      if (res.ok) {
-        const payload = await res.json();
-        setIssues(payload.data?.issues || []);
+      // Fetch issues
+      const issuesRes = await fetch(`/api/issues?chapterId=${chapterId}`);
+      if (issuesRes.ok) {
+        const issuesPayload = await issuesRes.json();
+        setIssues(issuesPayload.data?.issues || []);
+      }
+
+      // Fetch revisions for this chapter
+      const revisionsRes = await fetch(`/api/revisions?chapterId=${chapterId}`);
+      if (revisionsRes.ok) {
+        const revisionsPayload = await revisionsRes.json();
+        setRevisions(revisionsPayload.data?.revisions || []);
       }
     } catch (error) {
       console.error('Failed to fetch issues:', error);
@@ -162,8 +171,89 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
   const handleDirectRevision = async (issueId: string) => {
     const issue = issues.find((i) => i.id === issueId);
     if (!issue) return;
-    setSelectedText(issue.excerpt || '');
-    openModal(issue.excerpt || '');
+    const revision = revisions.find((r) => r.linkedIssueId === issueId);
+
+    // If we have a revision, pre-populate from it
+    if (revision) {
+      try {
+        const res = await fetch(`/api/revisions/${revision.id}`);
+        if (res.ok) {
+          const payload = await res.json();
+          const fullRevision = payload.data?.revision;
+          if (fullRevision) {
+            const { setCurrentRevision, setGoals, setSuggestions } = useRevisionStore.getState();
+            setCurrentRevision(fullRevision);
+            if (fullRevision.issueContext?.suggestion) {
+              setSuggestions([fullRevision.issueContext.suggestion]);
+            }
+            if (fullRevision.goals?.length) {
+              setGoals(fullRevision.goals);
+            }
+
+            // Use issue.excerpt if available, otherwise fetch chapter content
+            let originalText = issue.excerpt || '';
+            if (!originalText && selectedChapterId) {
+              // Fetch chapter content as fallback
+              const chapterRes = await fetch(`/api/chapters/${selectedChapterId}/draft`);
+              if (chapterRes.ok) {
+                const chapterData = await chapterRes.json();
+                const segments = chapterData.data?.segments || [];
+                originalText = segments.map((s: any) => s.content).join('\n\n') || '';
+              }
+            }
+
+            openModal(originalText, undefined, fullRevision.targetScope || 'segment');
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch revision:', error);
+      }
+    }
+
+    // Fallback: open modal with chapter content if no excerpt
+    let originalText = issue.excerpt || '';
+    if (!originalText && selectedChapterId) {
+      try {
+        const chapterRes = await fetch(`/api/chapters/${selectedChapterId}/draft`);
+        if (chapterRes.ok) {
+          const chapterData = await chapterRes.json();
+          const segments = chapterData.data?.segments || [];
+          originalText = segments.map((s: any) => s.content).join('\n\n') || '';
+        }
+      } catch (error) {
+        console.error('Failed to fetch chapter content:', error);
+      }
+    }
+    openModal(originalText, undefined, 'segment');
+  };
+
+  // Helper to get revision status for an issue
+  const getRevisionForIssue = (issueId: string): RevisionTask | undefined => {
+    return revisions.find((r) => r.linkedIssueId === issueId);
+  };
+
+  // Helper to get revision status label
+  const getRevisionStatusLabel = (status?: string) => {
+    const labels: Record<string, string> = {
+      draft: '待生成',
+      running: '生成中',
+      reviewed: '待应用',
+      applied: '已应用',
+      rejected: '已拒绝',
+    };
+    return labels[status || ''] || status;
+  };
+
+  const getRevisionStatusColor = (status?: string) => {
+    const colors: Record<string, string> = {
+      draft: 'bg-gray-100 text-gray-600',
+      running: 'bg-amber-100 text-amber-700',
+      reviewed: 'bg-blue-100 text-blue-700',
+      applied: 'bg-emerald-100 text-emerald-700',
+      rejected: 'bg-red-100 text-red-700',
+    };
+    return colors[status || ''] || 'bg-gray-100 text-gray-600';
   };
 
   const getFilteredAndSortedIssues = () => {
@@ -456,6 +546,18 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
                             <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_META[issue.status || 'open']?.classes || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
                               {STATUS_META[issue.status || 'open']?.label || '待处理'}
                             </span>
+                            {/* Show revision status if exists */}
+                            {(() => {
+                              const rev = getRevisionForIssue(issue.id);
+                              if (rev) {
+                                return (
+                                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getRevisionStatusColor(rev.status)}`}>
+                                    修订：{getRevisionStatusLabel(rev.status)}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                             {issue.paragraphIndex !== undefined && (
                               <span className="text-xs text-gray-400">第 {issue.paragraphIndex + 1} 段</span>
                             )}
@@ -467,24 +569,52 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
                           <p className="text-sm text-gray-600 leading-relaxed">{issue.reason}</p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap shrink-0">
-                          <button
-                            onClick={() => handleUpdateStatus(issue.id, 'fixed')}
-                            className="px-3 py-2 text-sm font-medium rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                          >
-                            标记已处理
-                          </button>
-                          <button
-                            onClick={() => handleUpdateStatus(issue.id, 'open')}
-                            className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            标记未处理
-                          </button>
-                          <button
-                            onClick={() => handleDirectRevision(issue.id)}
-                            className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition-colors"
-                          >
-                            直接修订
-                          </button>
+                          {(() => {
+                            const rev = getRevisionForIssue(issue.id);
+                            if (rev?.status === 'draft') {
+                              return (
+                                <button
+                                  onClick={() => handleDirectRevision(issue.id)}
+                                  className="px-3 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                                >
+                                  生成修订
+                                </button>
+                              );
+                            }
+                            if (rev?.status === 'reviewed') {
+                              return (
+                                <button
+                                  onClick={() => handleDirectRevision(issue.id)}
+                                  className="px-3 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                                >
+                                  查看修订
+                                </button>
+                              );
+                            }
+                            if (rev?.status === 'applied') {
+                              return (
+                                <span className="px-3 py-2 text-sm font-medium text-emerald-600">
+                                  已应用
+                                </span>
+                              );
+                            }
+                            return (
+                              <button
+                                onClick={() => handleDirectRevision(issue.id)}
+                                className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition-colors"
+                              >
+                                直接修订
+                              </button>
+                            );
+                          })()}
+                          {issue.status !== 'fixed' && (
+                            <button
+                              onClick={() => handleUpdateStatus(issue.id, 'fixed')}
+                              className="px-3 py-2 text-sm font-medium rounded-lg border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                            >
+                              标记已处理
+                            </button>
+                          )}
                         </div>
                       </div>
 
