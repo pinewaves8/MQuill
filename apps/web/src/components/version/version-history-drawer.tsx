@@ -9,6 +9,8 @@ interface VersionHistoryDrawerProps {
   onClose: () => void;
   onSelectVersion: (version: VersionRecord) => void;
   onRestoreVersion: (versionId: string) => void;
+  onSaveSnapshot?: () => void;
+  onCreateBranch?: (version: VersionRecord) => void;
 }
 
 export function VersionHistoryDrawer({
@@ -17,10 +19,17 @@ export function VersionHistoryDrawer({
   onClose,
   onSelectVersion,
   onRestoreVersion,
+  onSaveSnapshot,
+  onCreateBranch,
 }: VersionHistoryDrawerProps) {
   const [versions, setVersions] = useState<VersionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [versionDetail, setVersionDetail] = useState<{
+    version: VersionRecord;
+    lineage: VersionRecord[];
+    linkedIssues: { id: string; title: string; status: string }[];
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen && chapterId) {
@@ -43,6 +52,18 @@ export function VersionHistoryDrawer({
     }
   };
 
+  const fetchVersionDetail = async (versionId: string) => {
+    try {
+      const res = await fetch(`/api/versions/${versionId}`);
+      if (res.ok) {
+        const payload = await res.json();
+        setVersionDetail(payload.data || null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch version detail:', error);
+    }
+  };
+
   const handleRestore = async (versionId: string) => {
     if (!confirm('确定要恢复到这个版本吗？当前内容会作为备份保存。')) return;
 
@@ -60,6 +81,11 @@ export function VersionHistoryDrawer({
     }
   };
 
+  const handleVersionClick = (version: VersionRecord) => {
+    setSelectedVersionId(version.id);
+    fetchVersionDetail(version.id);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -75,14 +101,24 @@ export function VersionHistoryDrawer({
             <h3 className="text-lg font-semibold text-gray-900">版本历史</h3>
             <p className="text-xs text-gray-500 mt-0.5">{versions.length} 个版本</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {onSaveSnapshot && (
+              <button
+                onClick={onSaveSnapshot}
+                className="px-3 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50 rounded transition-colors"
+              >
+                保存当前
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Version List */}
@@ -104,17 +140,22 @@ export function VersionHistoryDrawer({
                   className={`px-6 py-4 hover:bg-gray-50 cursor-pointer ${
                     selectedVersionId === version.id ? 'bg-purple-50' : ''
                   }`}
-                  onClick={() => setSelectedVersionId(version.id)}
+                  onClick={() => handleVersionClick(version)}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-medium text-gray-900 text-sm truncate">
                           {version.label}
                         </h4>
                         {version.isCurrent && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700">
                             当前
+                          </span>
+                        )}
+                        {version.branchName && (
+                          <span className="text-[10px] bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded">
+                            {version.branchName}
                           </span>
                         )}
                       </div>
@@ -124,9 +165,15 @@ export function VersionHistoryDrawer({
                         {version.type === 'revision' && '修订'}
                         {version.type === 'branch' && '分支'}
                         {version.type === 'current' && '当前'}
+                        {version.type === 'baseline' && '基线'}
                       </p>
                       {version.summary && (
                         <p className="text-xs text-gray-400 mt-1 line-clamp-2">{version.summary}</p>
+                      )}
+                      {version.linkedIssueIds && version.linkedIssueIds.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-[10px] text-red-500">关联问题: {version.linkedIssueIds.length}个</span>
+                        </div>
                       )}
                     </div>
                     <div className="text-right shrink-0">
@@ -145,27 +192,58 @@ export function VersionHistoryDrawer({
                   </div>
 
                   {selectedVersionId === version.id && (
-                    <div className="mt-3 pt-3 border-t border-gray-200 flex gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectVersion(version);
-                        }}
-                        className="flex-1 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
-                      >
-                        查看内容
-                      </button>
-                      {!version.isCurrent && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      {/* Version Detail */}
+                      {versionDetail && versionDetail.version.id === version.id && (
+                        <div className="mb-3 p-2 bg-gray-50 rounded text-xs text-gray-600">
+                          <p>触发: {versionDetail.version.trigger || '-'}</p>
+                          <p>阶段: {versionDetail.version.stage || '-'}</p>
+                          {versionDetail.linkedIssues.length > 0 && (
+                            <div className="mt-1">
+                              <span className="text-red-500">关联问题: </span>
+                              {versionDetail.linkedIssues.map((issue) => (
+                                <span key={issue.id} className="ml-1 text-red-500">
+                                  [{issue.title}]
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 flex-wrap">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleRestore(version.id);
+                            onSelectVersion(version);
                           }}
-                          className="flex-1 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                          className="flex-1 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded transition-colors"
                         >
-                          恢复此版本
+                          查看内容
                         </button>
-                      )}
+                        {!version.isCurrent && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRestore(version.id);
+                            }}
+                            className="flex-1 py-1.5 text-xs font-medium text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                          >
+                            恢复
+                          </button>
+                        )}
+                        {onCreateBranch && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCreateBranch(version);
+                            }}
+                            className="flex-1 py-1.5 text-xs font-medium text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                          >
+                            分支
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

@@ -1,5 +1,16 @@
 // Version types
-export type VersionType = 'autosave' | 'manual' | 'revision' | 'branch' | 'current';
+export type VersionType = 'autosave' | 'manual' | 'revision' | 'branch' | 'current' | 'baseline';
+
+export type VersionTrigger =
+  | 'auto_outline'
+  | 'auto_scene_plan'
+  | 'auto_draft'
+  | 'manual_save'
+  | 'revision_apply'
+  | 'restore'
+  | 'branch_create';
+
+export type VersionStage = 'outline' | 'scene_plan' | 'draft' | 'revision';
 
 export interface VersionRecord {
   id: string;
@@ -7,7 +18,7 @@ export interface VersionRecord {
   chapterId: string;
   label: string;
   type: VersionType;
-  source: string;
+  source?: string;
   summary?: string;
   parentId?: string;
   branchName?: string;
@@ -15,6 +26,13 @@ export interface VersionRecord {
   wordCount: number;
   isCurrent: boolean;
   createdAt: Date;
+  // Phase 4 扩展字段
+  trigger?: VersionTrigger;
+  stage?: VersionStage;
+  linkedRevisionId?: string;
+  linkedIssueIds?: string[];
+  metricsSnapshot?: Record<string, number>;
+  isBranchHead?: boolean;
 }
 
 export interface CreateVersionInput {
@@ -27,6 +45,13 @@ export interface CreateVersionInput {
   branchName?: string;
   snapshotContent: string;
   wordCount: number;
+  // Phase 4 扩展字段
+  trigger?: VersionTrigger;
+  stage?: VersionStage;
+  linkedRevisionId?: string;
+  linkedIssueIds?: string[];
+  metricsSnapshot?: Record<string, number>;
+  isBranchHead?: boolean;
 }
 
 export interface CompareVersionsInput {

@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
 import { Chapter, VersionRecord } from '@packages/shared-types';
-import { VersionCard } from '@/components/version/version-card';
-import { VersionComparePanel } from '@/components/version/version-compare-panel';
-import { SaveVersionModal } from '@/components/version/save-version-modal';
-import { CreateBranchModal } from '@/components/version/create-branch-modal';
+import { VersionCard } from './version-card';
+import { VersionComparePanel } from './version-compare-panel';
+import { SaveVersionModal } from './save-version-modal';
+import { CreateBranchModal } from './create-branch-modal';
 
-export default function VersionsPage() {
-  const params = useParams();
-  const projectId = params.projectId as string;
+interface VersionWorkbenchProps {
+  projectId: string;
+  chapters: Chapter[];
+  currentChapter: Chapter | null;
+  onClose?: () => void;
+}
 
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
+export function VersionWorkbench({ projectId, chapters, currentChapter, onClose }: VersionWorkbenchProps) {
+  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(currentChapter?.id || null);
   const [versions, setVersions] = useState<VersionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -26,31 +28,19 @@ export default function VersionsPage() {
   const [branchVersion, setBranchVersion] = useState<VersionRecord | null>(null);
   const [showBranchModal, setShowBranchModal] = useState(false);
 
-  // Fetch chapters
+  // Sync with currentChapter from sidebar - when user selects a chapter, workbench follows
   useEffect(() => {
-    const fetchChapters = async () => {
-      try {
-        const res = await fetch(`/api/projects/${projectId}/chapters`);
-        if (res.ok) {
-          const payload = await res.json();
-          const chapterList = payload.data?.chapters || [];
-          setChapters(chapterList);
-          if (chapterList.length > 0 && !selectedChapterId) {
-            setSelectedChapterId(chapterList[0].id);
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch chapters:', error);
-      }
-    };
+    if (currentChapter) {
+      setSelectedChapterId(currentChapter.id);
+    }
+  }, [currentChapter?.id]);
 
-    fetchChapters();
-  }, [projectId]);
-
-  // Fetch versions when chapter changes
+  // Fetch versions when selectedChapterId changes
   useEffect(() => {
     if (!selectedChapterId) {
       setVersions([]);
+      setLeftVersion(null);
+      setRightVersion(null);
       setIsLoading(false);
       return;
     }
@@ -61,7 +51,13 @@ export default function VersionsPage() {
         const res = await fetch(`/api/chapters/${selectedChapterId}/versions`);
         if (res.ok) {
           const payload = await res.json();
-          setVersions(payload.data?.versions || []);
+          const fetchedVersions = payload.data?.versions || [];
+          setVersions(fetchedVersions);
+
+          // Auto-select: current version (left) vs previous version (right)
+          // Versions are sorted with current first (index 0), previous is index 1
+          setLeftVersion(fetchedVersions[0] || null);
+          setRightVersion(fetchedVersions[1] || null);
         }
       } catch (error) {
         console.error('Failed to fetch versions:', error);
@@ -79,7 +75,6 @@ export default function VersionsPage() {
     } else if (!rightVersion || rightVersion.id === leftVersion.id) {
       setRightVersion(version);
     } else {
-      // Both slots full, replace right
       setRightVersion(version);
     }
   };
@@ -120,9 +115,8 @@ export default function VersionsPage() {
     setShowBranchModal(true);
   };
 
-  const handleBranchSuccess = async (branchName: string) => {
-    alert(`分支「${branchName}」已创建`);
-    // Refresh versions
+  const handleBranchSuccess = async () => {
+    alert('分支已创建');
     if (selectedChapterId) {
       const versionsRes = await fetch(`/api/chapters/${selectedChapterId}/versions`);
       if (versionsRes.ok) {
@@ -133,7 +127,6 @@ export default function VersionsPage() {
   };
 
   const handleSaveSuccess = async () => {
-    // Refresh versions
     if (selectedChapterId) {
       const versionsRes = await fetch(`/api/chapters/${selectedChapterId}/versions`);
       if (versionsRes.ok) {
@@ -149,20 +142,22 @@ export default function VersionsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-full bg-gray-50 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 shrink-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <a
-              href={`/projects/${projectId}/editor`}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              返回编辑器
-            </a>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                返回
+              </button>
+            )}
             <h1 className="text-xl font-bold text-gray-900">版本工作台</h1>
           </div>
 
@@ -194,7 +189,7 @@ export default function VersionsPage() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl mx-auto w-full p-6">
+      <div className="flex-1 p-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <span className="text-gray-500">加载中...</span>
@@ -204,10 +199,10 @@ export default function VersionsPage() {
             <span className="text-gray-500">请选择要查看的章节</span>
           </div>
         ) : (
-          <div className="grid grid-cols-12 gap-6 h-[calc(100vh-180px)]">
+          <div className="grid grid-cols-10 gap-6 h-[calc(100vh-220px)]">
             {/* Left Panel: Version History */}
-            <div className="col-span-5 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+            <div className="col-span-4 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
                 <h2 className="font-semibold text-gray-900">
                   版本历史
                   <span className="ml-2 text-sm font-normal text-gray-500">
@@ -229,7 +224,7 @@ export default function VersionsPage() {
                         key={version.id}
                         version={version}
                         isSelected={
-                          (leftVersion?.id === version.id || rightVersion?.id === version.id)
+                          leftVersion?.id === version.id || rightVersion?.id === version.id
                         }
                         isComparing={false}
                         onSelect={handleVersionSelect}
@@ -244,8 +239,8 @@ export default function VersionsPage() {
             </div>
 
             {/* Right Panel: Comparison */}
-            <div className="col-span-7 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+            <div className="col-span-6 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0 flex items-center justify-between">
                 <h2 className="font-semibold text-gray-900">版本比较</h2>
                 {(leftVersion || rightVersion) && (
                   <button

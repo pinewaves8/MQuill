@@ -94,13 +94,43 @@ export const CreateRevisionSchema = z.object({
 export const CreateVersionSchema = z.object({
   chapterId: z.string().uuid(),
   label: z.string().min(1).max(120),
-  type: z.enum(['autosave', 'manual', 'revision', 'branch', 'current']).default('manual'),
+  type: z.enum(['autosave', 'manual', 'revision', 'branch', 'current', 'baseline']).default('manual'),
   source: z.string().optional(),
   summary: z.string().optional(),
   parentId: z.string().uuid().optional(),
   branchName: z.string().max(120).optional(),
   snapshotContent: z.string(),
   wordCount: z.number().int().optional(),
+  // Phase 4 扩展字段
+  trigger: z.enum([
+    'auto_outline',
+    'auto_scene_plan',
+    'auto_draft',
+    'manual_save',
+    'revision_apply',
+    'restore',
+    'branch_create',
+  ]).optional(),
+  stage: z.enum(['outline', 'scene_plan', 'draft', 'revision']).optional(),
+  linkedRevisionId: z.string().uuid().optional(),
+  linkedIssueIds: z.array(z.string().uuid()).optional(),
+  metricsSnapshot: z.record(z.string(), z.number()).optional(),
+  isBranchHead: z.boolean().optional(),
+});
+
+// 手动保存版本
+export const SnapshotVersionSchema = z.object({
+  label: z.string().min(1).max(120),
+  summary: z.string().optional(),
+  source: z.string().default('manual-save'),
+  metricsSnapshot: z.record(z.string(), z.number()).optional(),
+});
+
+// 创建分支版本
+export const CreateBranchVersionSchema = z.object({
+  branchName: z.string().min(1).max(120),
+  summary: z.string().optional(),
+  metricsSnapshot: z.record(z.string(), z.number()).optional(),
 });
 
 export const CompareVersionsSchema = z.object({
@@ -123,6 +153,8 @@ export const CreateIssueSchema = z.object({
 export const UpdateIssueSchema = z.object({
   status: z.enum(['open', 'in_revision', 'fixed', 'wont_fix']).optional(),
   linkedVersionId: z.string().uuid().optional(),
+  linkedVersionLabel: z.string().optional(),
+  linkedVersionSummary: z.string().optional(),
 });
 
 // Memory validation schemas

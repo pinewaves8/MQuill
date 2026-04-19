@@ -5,34 +5,42 @@ import { versionStore } from '@/lib/db/projects-store';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { versionIdA, versionIdB } = body;
 
-    if (!versionIdA || !versionIdB) {
+    // Support both old (versionIdA/B) and new (leftVersionId/rightVersionId) naming
+    const leftVersionId = body.leftVersionId || body.versionIdA;
+    const rightVersionId = body.rightVersionId || body.versionIdB;
+
+    if (!leftVersionId || !rightVersionId) {
       return NextResponse.json(
-        { error: 'versionIdA and versionIdB are required' },
+        { error: 'leftVersionId/rightVersionId (or versionIdA/versionIdB) are required' },
         { status: 400 }
       );
     }
 
-    const [versionA, versionB] = await Promise.all([
-      versionStore.getById(versionIdA),
-      versionStore.getById(versionIdB),
+    const [leftVersion, rightVersion] = await Promise.all([
+      versionStore.getById(leftVersionId),
+      versionStore.getById(rightVersionId),
     ]);
 
-    if (!versionA || !versionB) {
+    if (!leftVersion || !rightVersion) {
       return NextResponse.json(
         { error: 'Version not found' },
         { status: 404 }
       );
     }
 
-    // Generate simple diff operations (stub - use diff library in production)
-    const diffOperations = generateSimpleDiff(versionA.snapshotContent, versionB.snapshotContent);
+    // Generate diff
+    const diffOperations = generateSimpleDiff(leftVersion.snapshotContent, rightVersion.snapshotContent);
 
     return NextResponse.json({
       data: {
-        versionA,
-        versionB,
+        leftVersion,
+        rightVersion,
+        versionA: leftVersion,
+        versionB: rightVersion,
+        diff: {
+          operations: diffOperations,
+        },
         diffOperations,
       },
     });

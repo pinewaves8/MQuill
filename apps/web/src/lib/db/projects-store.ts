@@ -421,13 +421,18 @@ class VersionStore {
   async create(input: Omit<VersionRecord, 'id' | 'createdAt'>): Promise<VersionRecord> {
     this.ensureInitialized();
     const id = crypto.randomUUID();
+
+    // 如果是 branch 类型，默认 isCurrent 为 false
     const version: VersionRecord = {
       ...input,
       id,
       createdAt: new Date(),
+      isBranchHead: input.type === 'branch' ? true : input.isBranchHead,
     };
+
     this.versions.set(id, version);
 
+    // 如果是 current 版本，取消同章节其他 current
     if (version.isCurrent) {
       Array.from(this.versions.values())
         .filter((v) => v.chapterId === version.chapterId && v.id !== id)
@@ -439,11 +444,30 @@ class VersionStore {
     return version;
   }
 
+  async getByProject(projectId: string): Promise<VersionRecord[]> {
+    this.ensureInitialized();
+    return Array.from(this.versions.values())
+      .filter((v) => v.projectId === projectId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
   async getByChapter(chapterId: string): Promise<VersionRecord[]> {
     this.ensureInitialized();
     return Array.from(this.versions.values())
       .filter((v) => v.chapterId === chapterId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort((a, b) => {
+        // 当前版本优先
+        if (a.isCurrent && !b.isCurrent) return -1;
+        if (!a.isCurrent && b.isCurrent) return 1;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
+  }
+
+  async getCurrentByChapter(chapterId: string): Promise<VersionRecord | null> {
+    this.ensureInitialized();
+    return (
+      Array.from(this.versions.values()).find((v) => v.chapterId === chapterId && v.isCurrent) || null
+    );
   }
 
   async getById(id: string): Promise<VersionRecord | null> {
@@ -451,12 +475,122 @@ class VersionStore {
     return this.versions.get(id) || null;
   }
 
+  // 手动创建快照版本
+  async createSnapshot(input: {
+    chapterId: string;
+    projectId: string;
+    label: string;
+    summary?: string;
+    source?: string;
+    snapshotContent: string;
+    wordCount: number;
+    metricsSnapshot?: Record<string, number>;
+  }): Promise<VersionRecord> {
+    const currentVersion = await this.getCurrentByChapter(input.chapterId);
+    return this.create({
+      ...input,
+      type: 'manual',
+      trigger: 'manual_save',
+      stage: 'draft',
+      parentId: currentVersion?.id,
+      isCurrent: false, // 快照不改变当前版本
+    });
+  }
+
+  // 从现有版本创建分支
+  async createBranchFromVersion(
+    versionId: string,
+    options: {
+      branchName: string;
+      summary?: string;
+      snapshotContent: string;
+      wordCount: number;
+      metricsSnapshot?: Record<string, number>;
+    }
+  ): Promise<VersionRecord | null> {
+    const baseVersion = await this.getById(versionId);
+    if (!baseVersion) return null;
+
+    return this.create({
+      projectId: baseVersion.projectId,
+      chapterId: baseVersion.chapterId,
+      label: `${baseVersion.label} (分支)`,
+      type: 'branch',
+      trigger: 'branch_create',
+      stage: baseVersion.stage,
+      summary: options.summary,
+      parentId: versionId,
+      branchName: options.branchName,
+      snapshotContent: options.snapshotContent,
+      wordCount: options.wordCount,
+      metricsSnapshot: options.metricsSnapshot,
+      isCurrent: false,
+      isBranchHead: true,
+    });
+  }
+
+  // 关联 issue 到版本
+  async linkIssues(versionId: string, issueIds: string[]): Promise<VersionRecord | null> {
+    const version = await this.versions.get(versionId);
+    if (!version) return null;
+
+    const updated: VersionRecord = {
+      ...version,
+      linkedIssueIds: [...(version.linkedIssueIds || []), ...issueIds],
+    };
+    this.versions.set(versionId, updated);
+    this.persist();
+    return updated;
+  }
+
+  // 获取版本家谱（向上追溯 parent）
+  async getVersionLineage(versionId: string): Promise<VersionRecord[]> {
+    const lineage: VersionRecord[] = [];
+    let current = await this.getById(versionId);
+
+    while (current) {
+      lineage.push(current);
+      if (current.parentId) {
+        current = await this.getById(current.parentId);
+      } else {
+        break;
+      }
+    }
+
+    return lineage;
+  }
+
   async restore(id: string): Promise<VersionRecord | null> {
     this.ensureInitialized();
     const version = this.versions.get(id);
     if (!version) return null;
 
-    const updated = { ...version, isCurrent: true };
+    // 获取当前版本用于创建恢复前备份
+    const currentVersion = await this.getCurrentByChapter(version.chapterId);
+
+    // 创建恢复前备份
+    if (currentVersion && currentVersion.id !== id) {
+      await this.create({
+        projectId: currentVersion.projectId,
+        chapterId: currentVersion.chapterId,
+        label: `${currentVersion.label} (恢复前备份)`,
+        type: 'manual',
+        trigger: 'restore',
+        stage: currentVersion.stage,
+        summary: '恢复操作前自动备份',
+        parentId: currentVersion.id,
+        snapshotContent: currentVersion.snapshotContent,
+        wordCount: currentVersion.wordCount,
+        isCurrent: false,
+        linkedRevisionId: currentVersion.linkedRevisionId,
+        linkedIssueIds: currentVersion.linkedIssueIds,
+        metricsSnapshot: currentVersion.metricsSnapshot,
+        isBranchHead: false,
+      });
+    }
+
+    // 切换 current 到目标版本
+    const updated = { ...version, isCurrent: true, trigger: version.trigger || 'restore' };
     this.versions.set(id, updated);
 
     Array.from(this.versions.values())

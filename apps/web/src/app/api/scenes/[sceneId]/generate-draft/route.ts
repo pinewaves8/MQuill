@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { sceneStore, draftSegmentStore } from '@/lib/db/projects-store';
+import { sceneStore, draftSegmentStore, versionStore } from '@/lib/db/projects-store';
 import { writerAgent } from '@/lib/agents/writer-agent';
 
 interface RouteParams {
@@ -46,6 +46,29 @@ export async function POST(
 
     // Update scene status to generated
     await sceneStore.update(sceneId, { status: 'generated' });
+
+    // Phase 2: 自动落基线版本
+    // 检查该章节是否还没有版本记录，且正文长度超过最小阈值
+    const allSegments = await draftSegmentStore.getByChapter(scene.chapterId);
+    const totalContent = allSegments.map((s) => s.content).join('\n\n');
+    const existingVersions = await versionStore.getByChapter(scene.chapterId);
+
+    if (existingVersions.length === 0 && totalContent.length >= 50) {
+      // 创建首个基线版本
+      await versionStore.create({
+        projectId: scene.projectId,
+        chapterId: scene.chapterId,
+        label: '初稿 v1',
+        type: 'baseline',
+        source: 'auto-draft',
+        summary: '自动生成正文初稿',
+        snapshotContent: totalContent,
+        wordCount: totalContent.length,
+        isCurrent: true,
+        trigger: 'auto_draft',
+        stage: 'draft',
+      });
+    }
 
     return NextResponse.json({
       data: {

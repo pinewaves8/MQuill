@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { revisionCandidateStore, revisionStore, draftSegmentStore, versionStore, chapterStore } from '@/lib/db/projects-store';
+import {
+  chapterStore,
+  draftSegmentStore,
+  issueStore,
+  revisionCandidateStore,
+  revisionStore,
+  versionStore,
+} from '@/lib/db/projects-store';
 
 interface RouteParams {
   params: Promise<{ candidateId: string }>;
@@ -13,119 +20,134 @@ export async function POST(
   try {
     const { candidateId } = await params;
     const body = await request.json();
-    const { mode } = body;
+    const mode = body.mode as 'replace' | 'append' | 'branch';
 
     const candidate = await revisionCandidateStore.getById(candidateId);
     if (!candidate) {
-      return NextResponse.json(
-        { error: 'Candidate not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Candidate not found' }, { status: 404 });
     }
 
     const revision = await revisionStore.getById(candidate.revisionTaskId);
     if (!revision) {
-      return NextResponse.json(
-        { error: 'Revision task not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Revision task not found' }, { status: 404 });
     }
 
-    // Create a version record before applying
     const chapter = await chapterStore.getById(revision.chapterId);
     if (!chapter) {
-      return NextResponse.json(
-        { error: 'Chapter not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Chapter not found' }, { status: 404 });
     }
 
-    // Get current content for snapshot
     const segments = await draftSegmentStore.getByChapter(revision.chapterId);
-    const currentContent = segments.map((s) => s.content).join('\n\n');
+    const currentContent = segments.map((segment) => segment.content).join('\n\n');
+    const currentVersion = await versionStore.getCurrentByChapter(revision.chapterId);
 
-    await versionStore.create({
+    if (mode === 'branch') {
+      const branchVersion = currentVersion
+        ? await versionStore.createBranchFromVersion(currentVersion.id, {
+            branchName: `修订分支-${Date.now()}`,
+            summary: `保留修订候选稿：${revision.suggestion}`,
+            snapshotContent: candidate.candidateText,
+            wordCount: candidate.candidateText.length,
+          })
+        : await versionStore.create({
+            projectId: revision.projectId,
+            chapterId: revision.chapterId,
+            label: `修订分支 ${Date.now().toString().slice(-4)}`,
+            type: 'branch',
+            source: `revision:${revision.id}`,
+            summary: `保留修订候选稿：${revision.suggestion}`,
+            branchName: '修订候选稿',
+            snapshotContent: candidate.candidateText,
+            wordCount: candidate.candidateText.length,
+            isCurrent: false,
+            trigger: 'revision_apply',
+            stage: 'revision',
+            linkedRevisionId: revision.id,
+            linkedIssueIds: revision.linkedIssueId ? [revision.linkedIssueId] : [],
+            isBranchHead: true,
+          });
+
+      await revisionStore.update(revision.id, { status: 'applied' });
+
+      if (revision.linkedIssueId && branchVersion) {
+        await issueStore.update(revision.linkedIssueId, {
+          status: 'in_revision',
+          linkedVersionId: branchVersion.id,
+          linkedVersionLabel: branchVersion.label,
+          linkedVersionSummary: branchVersion.summary,
+        });
+        await versionStore.linkIssues(branchVersion.id, [revision.linkedIssueId]);
+      }
+
+      return NextResponse.json({
+        data: {
+          success: true,
+          appliedMode: 'branch',
+          version: branchVersion,
+        },
+      });
+    }
+
+    const beforeVersion = await versionStore.create({
       projectId: revision.projectId,
       chapterId: revision.chapterId,
-      label: `修订前版本`,
+      label: `修订前备份 ${Date.now().toString().slice(-4)}`,
       type: 'revision',
       source: `revision:${revision.id}`,
-      summary: `修订建议: ${revision.suggestion}`,
+      summary: `修订前快照：${revision.suggestion}`,
       snapshotContent: currentContent,
       wordCount: currentContent.length,
       isCurrent: false,
+      trigger: 'revision_apply',
+      stage: 'revision',
+      linkedRevisionId: revision.id,
+      linkedIssueIds: revision.linkedIssueId ? [revision.linkedIssueId] : [],
+      parentId: currentVersion?.id,
     });
 
-    // Apply the candidate based on mode
     if (mode === 'replace' || mode === 'append') {
-      // Determine target segment
       let targetSegmentId = revision.targetRefId;
-      let targetSegmentIndex = -1;
 
       if (!targetSegmentId) {
-        // No targetRefId provided - use the first non-locked segment or first segment
-        const editableSegments = segments.filter((s) => !s.isLocked);
+        const editableSegments = segments.filter((segment) => !segment.isLocked);
         if (editableSegments.length > 0) {
           targetSegmentId = editableSegments[0].id;
-          targetSegmentIndex = editableSegments[0].segmentIndex;
         } else if (segments.length > 0) {
           targetSegmentId = segments[0].id;
-          targetSegmentIndex = segments[0].segmentIndex;
         }
       }
 
       if (targetSegmentId) {
-        const seg = segments.find((s) => s.id === targetSegmentId);
-        const originalContent = seg?.content || '';
+        const targetSegment = segments.find((segment) => segment.id === targetSegmentId);
+        const originalContent = targetSegment?.content || '';
 
         if (mode === 'replace') {
-          // Find the original text within the segment and replace it precisely
-          // candidate.originalText is the user's selected text
-          // candidate.candidateText is the revised version
           if (candidate.originalText && originalContent.includes(candidate.originalText)) {
-            // Precise replacement: only replace the selected portion
-            const newContent = originalContent.replace(candidate.originalText, candidate.candidateText);
             await draftSegmentStore.update(targetSegmentId, {
-              content: newContent,
+              content: originalContent.replace(candidate.originalText, candidate.candidateText),
               source: 'ai',
             });
           } else {
-            // Fallback: if original text not found exactly, try to find and replace
-            // This handles cases where whitespace might differ
-            const escapedOriginal = candidate.originalText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(escapedOriginal, 'g');
-            if (regex.test(originalContent)) {
-              const newContent = originalContent.replace(regex, candidate.candidateText);
-              await draftSegmentStore.update(targetSegmentId, {
-                content: newContent,
-                source: 'ai',
-              });
-            } else {
-              // Last resort: just replace the entire segment
-              await draftSegmentStore.update(targetSegmentId, {
-                content: candidate.candidateText,
-                source: 'ai',
-              });
-            }
-          }
-        } else if (mode === 'append') {
-          // Append candidate after the original text within the segment
-          if (candidate.originalText && originalContent.includes(candidate.originalText)) {
-            const newContent = originalContent.replace(candidate.originalText, candidate.originalText + '\n\n' + candidate.candidateText);
             await draftSegmentStore.update(targetSegmentId, {
-              content: newContent,
-              source: 'ai',
-            });
-          } else {
-            // Fallback: just append to end
-            await draftSegmentStore.update(targetSegmentId, {
-              content: originalContent + '\n\n' + candidate.candidateText,
+              content: candidate.candidateText,
               source: 'ai',
             });
           }
+        } else {
+          const appendedContent =
+            candidate.originalText && originalContent.includes(candidate.originalText)
+              ? originalContent.replace(
+                  candidate.originalText,
+                  `${candidate.originalText}\n\n${candidate.candidateText}`
+                )
+              : `${originalContent}\n\n${candidate.candidateText}`.trim();
+
+          await draftSegmentStore.update(targetSegmentId, {
+            content: appendedContent,
+            source: 'ai',
+          });
         }
       } else {
-        // No segment exists, create one
         await draftSegmentStore.upsert({
           projectId: revision.projectId,
           chapterId: revision.chapterId,
@@ -136,13 +158,13 @@ export async function POST(
         });
       }
     } else if (revision.targetScope === 'chapter') {
-      // Replace all segments with single revised content
-      for (const seg of segments) {
-        await draftSegmentStore.update(seg.id, {
+      for (const segment of segments) {
+        await draftSegmentStore.update(segment.id, {
           content: '',
           isLocked: false,
         });
       }
+
       await draftSegmentStore.upsert({
         projectId: revision.projectId,
         chapterId: revision.chapterId,
@@ -152,43 +174,53 @@ export async function POST(
         isLocked: false,
       });
     }
-    // 'branch' mode would create a new branch - stub for now
 
-    // Update revision status to applied
     await revisionStore.update(revision.id, { status: 'applied' });
 
-    // Create new current version
-    await versionStore.create({
+    const newSegments = await draftSegmentStore.getByChapter(revision.chapterId);
+    const newContent = newSegments.map((segment) => segment.content).join('\n\n');
+    const appliedVersion = await versionStore.create({
       projectId: revision.projectId,
       chapterId: revision.chapterId,
-      label: `修订后版本`,
+      label: `修订后版本 ${Date.now().toString().slice(-4)}`,
       type: 'revision',
       source: `revision:${revision.id}`,
-      summary: `应用修订建议: ${revision.suggestion}`,
-      snapshotContent: candidate.candidateText,
-      wordCount: candidate.candidateText.length,
+      summary: `应用修订建议：${revision.suggestion}`,
+      snapshotContent: newContent,
+      wordCount: newContent.length,
       isCurrent: true,
+      trigger: 'revision_apply',
+      stage: 'revision',
+      linkedRevisionId: revision.id,
+      linkedIssueIds: revision.linkedIssueId ? [revision.linkedIssueId] : [],
+      parentId: beforeVersion.id,
     });
 
-    // Update chapter word count
-    const newSegments = await draftSegmentStore.getByChapter(revision.chapterId);
-    const newWordCount = newSegments.reduce((sum, s) => sum + s.content.length, 0);
+    const newWordCount = newSegments.reduce((sum, segment) => sum + segment.content.length, 0);
     await chapterStore.update(revision.chapterId, {
       wordCount: newWordCount,
       status: newWordCount > 0 ? 'drafting' : chapter.status,
     });
 
+    if (revision.linkedIssueId) {
+      await issueStore.update(revision.linkedIssueId, {
+        status: 'fixed',
+        linkedVersionId: appliedVersion.id,
+        linkedVersionLabel: appliedVersion.label,
+        linkedVersionSummary: appliedVersion.summary,
+      });
+      await versionStore.linkIssues(appliedVersion.id, [revision.linkedIssueId]);
+    }
+
     return NextResponse.json({
       data: {
         success: true,
         appliedMode: mode,
+        version: appliedVersion,
       },
     });
   } catch (error) {
     console.error('Error applying candidate:', error);
-    return NextResponse.json(
-      { error: 'Failed to apply candidate' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to apply candidate' }, { status: 500 });
   }
 }

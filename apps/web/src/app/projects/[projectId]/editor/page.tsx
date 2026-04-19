@@ -14,6 +14,7 @@ import { EvaluationPanel } from '@/components/editor/evaluation-panel';
 import { ProjectOverview } from '@/components/project/project-overview';
 import { OutlineView } from '@/components/project/outline-view';
 import { VersionHistoryDrawer } from '@/components/version/version-history-drawer';
+import { VersionWorkbench } from '@/components/version/version-workbench';
 import { useRevisionStore } from '@/lib/state/revision-store';
 
 export default function EditorPage() {
@@ -57,10 +58,10 @@ export default function EditorPage() {
     }
   }, [leftTab]);
 
-  // Handle versions tab
+  // Handle versions tab - no longer opens drawer, VersionWorkbench renders in main area
   useEffect(() => {
     if (leftTab === 'versions') {
-      setShowVersionHistory(true);
+      setShowVersionHistory(false); // Close drawer when using workbench
     }
   }, [leftTab]);
 
@@ -226,6 +227,13 @@ export default function EditorPage() {
                 .then((res) => res.json())
                 .then((payload) => setChapters(payload.data?.chapters || []));
             }}
+          />
+        ) : leftTab === 'versions' && currentChapter ? (
+          <VersionWorkbench
+            projectId={projectId}
+            chapters={chapters}
+            currentChapter={currentChapter}
+            onClose={() => setLeftTab('chapters')}
           />
         ) : (
           <>
