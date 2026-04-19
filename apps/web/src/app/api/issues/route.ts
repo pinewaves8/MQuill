@@ -57,6 +57,9 @@ export async function POST(request: Request) {
       locationRef: input.locationRef,
       suggestion: input.suggestion,
       status: 'open',
+      tags: input.tags,
+      revisionLevel: input.revisionLevel,
+      aiSmellSeverity: input.aiSmellSeverity,
     });
 
     return NextResponse.json({ data: { issue } }, { status: 201 });

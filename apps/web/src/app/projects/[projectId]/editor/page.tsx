@@ -11,6 +11,7 @@ import { RichTextEditor } from '@/components/editor/rich-text-editor';
 import { RevisionModal } from '@/components/editor/revision-modal';
 import { SelectionToolbar } from '@/components/editor/selection-toolbar';
 import { EvaluationPanel } from '@/components/editor/evaluation-panel';
+import { EvaluationWorkbench } from '@/components/version/evaluation-workbench';
 import { ProjectOverview } from '@/components/project/project-overview';
 import { OutlineView } from '@/components/project/outline-view';
 import { VersionHistoryDrawer } from '@/components/version/version-history-drawer';
@@ -48,15 +49,7 @@ export default function EditorPage() {
       return 'chapters';
     }
   );
-  const [showEvaluation, setShowEvaluation] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
-
-  // Handle evaluation tab
-  useEffect(() => {
-    if (leftTab === 'evaluation') {
-      setShowEvaluation(true);
-    }
-  }, [leftTab]);
 
   // Handle versions tab - no longer opens drawer, VersionWorkbench renders in main area
   useEffect(() => {
@@ -235,6 +228,13 @@ export default function EditorPage() {
             currentChapter={currentChapter}
             onClose={() => setLeftTab('chapters')}
           />
+        ) : leftTab === 'evaluation' ? (
+          <EvaluationWorkbench
+            projectId={projectId}
+            chapters={chapters}
+            currentChapter={currentChapter}
+            onClose={() => setLeftTab('chapters')}
+          />
         ) : (
           <>
             <EditorHeader
@@ -263,19 +263,6 @@ export default function EditorPage() {
 
       {/* Selection Toolbar */}
       <SelectionToolbar />
-
-      {/* Evaluation Panel */}
-      {showEvaluation && currentChapter && (
-        <EvaluationPanel
-          chapterId={currentChapter.id}
-          projectId={projectId}
-          isOpen={showEvaluation}
-          onClose={() => {
-            setShowEvaluation(false);
-            setLeftTab('chapters');
-          }}
-        />
-      )}
 
       {/* Version History Drawer */}
       {showVersionHistory && currentChapter && (

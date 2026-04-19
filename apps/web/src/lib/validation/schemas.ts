@@ -139,15 +139,53 @@ export const CompareVersionsSchema = z.object({
 });
 
 // Issue validation schemas
+// Issue types: legacy 6-dim + new 8-dim evaluation dimensions
+const ISSUE_TYPES = [
+  // Legacy 6-dim
+  'style', 'pacing', 'character', 'lore', 'timeline', 'clarity',
+  // 8-dim evaluation dimensions
+  'chapter_goal_completion',
+  'plot_progress_and_causality',
+  'conflict_and_tension',
+  'character_and_voice',
+  'language_and_style',
+  'continuity_and_consistency',
+  'information_and_pacing',
+  'ending_hook',
+  'ai_smell',
+] as const;
+
+// Issue tags from design doc
+const ISSUE_TAGS = [
+  // 剧情类
+  'weak_plot_progress', 'causality_gap', 'convenient_plot_device', 'missing_key_event',
+  // 冲突类
+  'low_tension', 'weak_conflict', 'stakes_too_low',
+  // 人物类
+  'flat_character_voice', 'character_out_of_role', 'weak_protagonist_agency', 'tool_like_supporting_cast',
+  // 语言风格类
+  'ai_smell', 'repetitive_expression', 'expository_tone', 'over_abstract_emotion', 'weak_style_alignment',
+  // 连贯性类
+  'continuity_error', 'worldbuilding_conflict', 'timeline_conflict', 'abrupt_transition',
+  // 节奏类
+  'pace_too_slow', 'pace_too_fast', 'info_dump', 'underdeveloped_scene',
+  // 章节结构类
+  'missing_hook', 'chapter_goal_not_met', 'chapter_flat_arc',
+] as const;
+
 export const CreateIssueSchema = z.object({
   projectId: z.string().uuid(),
   chapterId: z.string().uuid(),
-  issueType: z.enum(['style', 'pacing', 'character', 'lore', 'timeline', 'clarity']),
+  issueType: z.enum(ISSUE_TYPES),
   severity: z.enum(['low', 'medium', 'high']),
   title: z.string().min(1).max(200),
   reason: z.string().min(1),
   locationRef: z.string().optional(),
   suggestion: z.string().optional(),
+  // Extended fields
+  tags: z.array(z.enum(ISSUE_TAGS)).optional(),
+  revisionLevel: z.enum(['must_fix', 'should_improve', 'optional_enhancement']).optional(),
+  aiSmellSeverity: z.enum(['low', 'medium', 'high']).optional(),
 });
 
 export const UpdateIssueSchema = z.object({
