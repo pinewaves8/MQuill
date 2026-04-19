@@ -43,10 +43,10 @@ c:/tao/MQuill/
 
 | 模块 | 状态 | 说明 |
 |------|------|------|
-| 项目/章节/场景 CRUD | ✅ | 24 个 API 端点 |
+| 项目/章节/场景 CRUD | ✅ | 24+ 个 API 端点 |
 | 三栏编辑器 | ✅ | 连续模式 + 分段虚拟滚动模式 |
 | 修订流程 | ✅ | RevisionModal + DiffViewer |
-| 版本历史 | ✅ | 比较、恢复、分支 |
+| 版本历史 | ✅ | 版本工作台 - 比较/恢复/分支/快照 |
 | 评估系统 | ✅ | CriticAgent + EvaluationPanel |
 | 记忆管理 | ✅ | Charter + 5种类型记忆 |
 | Bootstrap Agent | ✅ | 自动生成项目设定 |
@@ -119,6 +119,36 @@ cd apps/web && npm run dev
 ---
 
 ## 📝 最新进度记录（倒序，最新的在最上面）
+
+- **2026-04-19**：完成版本工作台 MVP - 完整实现版本系统升级
+  - 提交：`7ab82d9`，18 files changed, 1909 insertions(+), 378 deletions(-)
+  - **Phase 0-7 全部完成**：
+    - Phase 0：扩展 `VersionRecord` 类型（新增 `trigger`, `stage`, `linkedRevisionId`, `linkedIssueIds`, `metricsSnapshot`, `isBranchHead` 字段）
+    - Phase 1：扩展 `VersionStore` 存储能力（`createSnapshot`, `createBranchFromVersion`, `linkIssues`, `getVersionLineage` 等方法）
+    - Phase 2：补齐版本创建时机（自动生成正文落基线版本、修订应用规范化、恢复前备份、branch 模式）
+    - Phase 3：项目级版本 API（`GET /api/projects/:id/versions` 聚合接口、版本详情返回 lineage 和关联信息）
+    - Phase 4：评估与版本打通（修订应用后自动更新 issue 的 `linkedVersionId/linkedVersionLabel/linkedVersionSummary`）
+    - Phase 5：版本页面重做为工作台（`VersionWorkbench` 组件，4:6 左右分栏布局）
+    - Phase 6：编辑器抽屉升级（`VersionHistoryDrawer` 增加保存当前、分支、关联问题查看）
+    - Phase 7：状态管理扩展（`VersionStore` 新增 `selectedChapterId`, `filterType`, `showBranchOnly`）
+  - **新增组件**：
+    - `version-card.tsx` - 版本卡片（版本号、当前标识、来源/分支标签、恢复按钮）
+    - `version-compare-panel.tsx` - 版本比较面板（内容对比/差异视图切换、左右并排显示全文）
+    - `save-version-modal.tsx` - 保存当前版本弹窗
+    - `create-branch-modal.tsx` - 创建分支版本弹窗
+    - `version-workbench.tsx` - 版本工作台整合组件
+  - **核心文件**：
+    - `packages/shared-types/version.ts` - VersionRecord 类型扩展
+    - `apps/web/src/lib/db/projects-store.ts` - VersionStore 方法扩展
+    - `apps/web/src/lib/validation/schemas.ts` - 新增 SnapshotVersionSchema, CreateBranchVersionSchema
+    - `apps/web/src/app/api/scenes/[sceneId]/generate-draft/route.ts` - 自动落基线版本
+    - `apps/web/src/app/api/revision-candidates/[candidateId]/apply/route.ts` - 修订应用规范化
+    - `apps/web/src/app/api/versions/[versionId]/route.ts` - 恢复 + 分支创建
+    - `apps/web/src/app/api/chapters/[chapterId]/versions/route.ts` - 快照接口
+    - `apps/web/src/app/api/projects/[projectId]/versions/route.ts` - 项目级版本聚合
+    - `apps/web/src/components/version/version-*.tsx` - 5个版本相关组件
+    - `apps/web/src/app/projects/[projectId]/editor/page.tsx` - 版本 tab 集成
+  - **版本工作台访问方式**：编辑器左侧导航点击"版本"tab → 主区域显示版本工作台
 
 - **2026-04-18**：接通 repair-agent + 修订流程
   - 创建 `lib/agents/repair-agent.ts` - 实现真正的 AI 修订代理
@@ -255,7 +285,7 @@ cd apps/web && npm run dev
 
 ## 🚧 当前功能清单
 
-### 已完成的 API 端点 (24个)
+### 已完成的 API 端点 (27+个)
 
 | 端点 | 说明 |
 |------|------|
@@ -264,7 +294,8 @@ cd apps/web && npm run dev
 | GET /api/projects/:id/chapters | 章节列表 |
 | POST /api/chapters | 创建章节 |
 | GET/PUT /api/chapters/:id/draft | 正文获取/保存 |
-| GET /api/chapters/:id/versions | 版本历史 |
+| GET/POST /api/chapters/:id/versions | 版本历史/创建快照 |
+| POST /api/projects/:id/versions | 项目级版本聚合 |
 | POST /api/scenes | 创建场景 |
 | GET/PATCH/DELETE /api/scenes/:id | 场景 CRUD |
 | POST /api/scenes/reorder | 场景拖拽排序 |
@@ -279,7 +310,7 @@ cd apps/web && npm run dev
 | GET/POST /api/memories | 记忆查询/创建 |
 | PATCH/DELETE /api/memories/:id | 记忆更新/删除 |
 | POST /api/versions/compare | 版本比较 |
-| POST /api/versions/:id/restore | 恢复版本 |
+| GET/POST /api/versions/:id | 版本详情/恢复/创建分支 |
 | POST /api/agents/evaluate/:chapterId | 评估章节 |
 
 ### 已完成的 Agent (3个)
@@ -299,8 +330,8 @@ cd apps/web && npm run dev
 ### 已完成的页面
 
 - `/` - Dashboard 主页（搜索/筛选/删除）
-- `/projects/[projectId]/editor` - 三栏编辑器
-- `/projects/[projectId]/versions` - 版本比较页面
+- `/projects/[projectId]/editor` - 三栏编辑器（包含版本工作台tab）
+- `/projects/[projectId]/versions` - 独立版本工作台页面
 - `/projects/[projectId]/settings` - 项目设置页面
 - `/projects/[projectId]/editor` (大纲视图) - 章节/场景树形结构
 
