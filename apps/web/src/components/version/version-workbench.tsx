@@ -189,7 +189,7 @@ export function VersionWorkbench({ projectId, chapters, currentChapter, onClose 
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-6">
+      <div className="flex-1 overflow-y-auto p-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
             <span className="text-gray-500">加载中...</span>
@@ -199,9 +199,9 @@ export function VersionWorkbench({ projectId, chapters, currentChapter, onClose 
             <span className="text-gray-500">请选择要查看的章节</span>
           </div>
         ) : (
-          <div className="grid grid-cols-10 gap-6 h-[calc(100vh-220px)]">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-10">
             {/* Left Panel: Version History */}
-            <div className="col-span-4 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="xl:col-span-4 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
                 <h2 className="font-semibold text-gray-900">
                   版本历史
@@ -211,7 +211,7 @@ export function VersionWorkbench({ projectId, chapters, currentChapter, onClose 
                 </h2>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="p-4">
                 {versions.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-500">暂无版本记录</p>
@@ -239,7 +239,7 @@ export function VersionWorkbench({ projectId, chapters, currentChapter, onClose 
             </div>
 
             {/* Right Panel: Comparison */}
-            <div className="col-span-6 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="xl:col-span-6 flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 shrink-0 flex items-center justify-between">
                 <h2 className="font-semibold text-gray-900">版本比较</h2>
                 {(leftVersion || rightVersion) && (
@@ -252,7 +252,7 @@ export function VersionWorkbench({ projectId, chapters, currentChapter, onClose 
                 )}
               </div>
 
-              <div className="flex-1 p-4 overflow-hidden">
+              <div className="p-4">
                 <VersionComparePanel
                   leftVersion={leftVersion}
                   rightVersion={rightVersion}
