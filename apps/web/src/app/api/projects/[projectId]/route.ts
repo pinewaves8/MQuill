@@ -25,9 +25,11 @@ export async function GET(
     const tags = await projectStore.getTags(projectId);
 
     return NextResponse.json({
-      project: {
-        ...project,
-        tags: tags.map((t) => t.tag),
+      data: {
+        project: {
+          ...project,
+          tags: tags.map((t) => t.tag),
+        },
       },
     });
   } catch (error) {
@@ -87,9 +89,11 @@ export async function PATCH(
     const tags = await projectStore.getTags(projectId);
 
     return NextResponse.json({
-      project: {
-        ...project,
-        tags: tags.map((t) => t.tag),
+      data: {
+        project: {
+          ...project,
+          tags: tags.map((t) => t.tag),
+        },
       },
     });
   } catch (error) {
@@ -117,7 +121,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ data: { success: true } });
   } catch (error) {
     console.error('Error deleting project:', error);
     return NextResponse.json(

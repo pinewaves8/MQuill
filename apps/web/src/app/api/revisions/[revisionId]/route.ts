@@ -20,7 +20,9 @@ export async function GET(
     const candidates = await revisionCandidateStore.getByRevision(revisionId);
 
     return NextResponse.json({
-      revision: { ...revision, candidates },
+      data: {
+        revision: { ...revision, candidates },
+      },
     });
   } catch (error) {
     console.error('Error fetching revision:', error);

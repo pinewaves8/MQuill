@@ -40,6 +40,15 @@ interface EvaluationMetrics {
   consistency: number;
 }
 
+interface EvaluationScoreSummary {
+  style: number;
+  pacing: number;
+  character: number;
+  lore: number;
+  timeline: number;
+  clarity: number;
+}
+
 export function EvaluationPanel({ chapterId, projectId, isOpen, onClose }: EvaluationPanelProps) {
   const [issues, setIssues] = useState<EvaluationIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -64,8 +73,8 @@ export function EvaluationPanel({ chapterId, projectId, isOpen, onClose }: Evalu
     try {
       const res = await fetch(`/api/issues?chapterId=${chapterId}`);
       if (res.ok) {
-        const data = await res.json();
-        setIssues(data.issues || []);
+        const payload = await res.json();
+        setIssues(payload.data?.issues || []);
       }
     } catch (error) {
       console.error('Failed to fetch issues:', error);
@@ -81,10 +90,20 @@ export function EvaluationPanel({ chapterId, projectId, isOpen, onClose }: Evalu
         method: 'POST',
       });
       if (res.ok) {
-        const data = await res.json();
+        const payload = await res.json();
+        const data = payload.data ?? {};
         setIssues(data.issues || []);
         if (data.metrics) {
           setMetrics(data.metrics);
+        } else if (data.scoreSummary) {
+          const scoreSummary = data.scoreSummary as EvaluationScoreSummary;
+          setMetrics({
+            readability: scoreSummary.clarity,
+            rhythm: scoreSummary.pacing,
+            consistency: Math.round(
+              (scoreSummary.character + scoreSummary.lore + scoreSummary.timeline) / 3
+            ),
+          });
         }
       }
     } catch (error) {
@@ -102,8 +121,8 @@ export function EvaluationPanel({ chapterId, projectId, isOpen, onClose }: Evalu
         body: JSON.stringify({ status }),
       });
       if (res.ok) {
-        const data = await res.json();
-        setIssues((prev) => prev.map((i) => (i.id === issueId ? data.issue : i)));
+        const payload = await res.json();
+        setIssues((prev) => prev.map((i) => (i.id === issueId ? payload.data?.issue ?? i : i)));
       }
     } catch (error) {
       console.error('Failed to update issue:', error);

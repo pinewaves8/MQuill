@@ -28,10 +28,12 @@ export async function POST(request: Request) {
     }
 
     const response = NextResponse.json({
-      user: {
-        id: result.id,
-        email: result.email,
-        name: result.name,
+      data: {
+        user: {
+          id: result.id,
+          email: result.email,
+          name: result.name,
+        },
       },
     });
 

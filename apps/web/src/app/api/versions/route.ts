@@ -30,9 +30,11 @@ export async function POST(request: Request) {
     const diffOperations = generateSimpleDiff(versionA.snapshotContent, versionB.snapshotContent);
 
     return NextResponse.json({
-      versionA,
-      versionB,
-      diffOperations,
+      data: {
+        versionA,
+        versionB,
+        diffOperations,
+      },
     });
   } catch (error) {
     console.error('Error comparing versions:', error);

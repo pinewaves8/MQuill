@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { RevisionTask, RevisionCandidate } from '@packages/shared-types';
 
 interface RevisionState {
@@ -55,47 +56,63 @@ const initialState = {
   applyMode: 'replace' as const,
 };
 
-export const useRevisionStore = create<RevisionState>()((set) => ({
-  ...initialState,
+export const useRevisionStore = create<RevisionState>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  openModal: (selectedText = '', range = undefined, targetScope = 'selection') =>
-    set({
-      isModalOpen: true,
-      selectedText,
-      selectionRange: range,
-      targetScope,
+      openModal: (selectedText = '', range = undefined, targetScope = 'selection') =>
+        set({
+          isModalOpen: true,
+          selectedText,
+          selectionRange: range,
+          targetScope,
+        }),
+
+      closeModal: () => set(initialState),
+
+      setSelectedText: (selectedText) => set({ selectedText }),
+
+      setSelectionRange: (selectionRange) => set({ selectionRange }),
+
+      setTargetScope: (targetScope) => set({ targetScope }),
+
+      setCurrentRevision: (currentRevision) => set({ currentRevision }),
+
+      setCandidates: (candidates) => set({ candidates }),
+
+      addCandidate: (candidate) =>
+        set((state) => ({
+          candidates: [...state.candidates, candidate],
+          currentCandidateIndex: state.candidates.length,
+        })),
+
+      setCurrentCandidateIndex: (currentCandidateIndex) =>
+        set({ currentCandidateIndex }),
+
+      setSuggestions: (suggestions) => set({ suggestions }),
+
+      setGoals: (goals) => set({ goals }),
+
+      setConstraints: (constraints) => set({ constraints }),
+
+      setApplyMode: (applyMode) => set({ applyMode }),
+
+      setIsReviewing: (isReviewing) => set({ isReviewing }),
+
+      reset: () => set(initialState),
     }),
-
-  closeModal: () => set(initialState),
-
-  setSelectedText: (selectedText) => set({ selectedText }),
-
-  setSelectionRange: (selectionRange) => set({ selectionRange }),
-
-  setTargetScope: (targetScope) => set({ targetScope }),
-
-  setCurrentRevision: (currentRevision) => set({ currentRevision }),
-
-  setCandidates: (candidates) => set({ candidates }),
-
-  addCandidate: (candidate) =>
-    set((state) => ({
-      candidates: [...state.candidates, candidate],
-      currentCandidateIndex: state.candidates.length,
-    })),
-
-  setCurrentCandidateIndex: (currentCandidateIndex) =>
-    set({ currentCandidateIndex }),
-
-  setSuggestions: (suggestions) => set({ suggestions }),
-
-  setGoals: (goals) => set({ goals }),
-
-  setConstraints: (constraints) => set({ constraints }),
-
-  setApplyMode: (applyMode) => set({ applyMode }),
-
-  setIsReviewing: (isReviewing) => set({ isReviewing }),
-
-  reset: () => set(initialState),
-}));
+    {
+      name: 'mquill-revision-state',
+      partialize: (state) => ({
+        selectedText: state.selectedText,
+        selectionRange: state.selectionRange,
+        targetScope: state.targetScope,
+        suggestions: state.suggestions,
+        goals: state.goals,
+        constraints: state.constraints,
+        applyMode: state.applyMode,
+      }),
+    }
+  )
+);

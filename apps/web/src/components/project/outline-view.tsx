@@ -41,17 +41,17 @@ export function OutlineView({ project, onSelectChapter, onRefreshChapters }: Out
       try {
         const charterRes = await fetch(`/api/projects/${project.id}/charter`);
         if (charterRes.ok) {
-          const charterData = await charterRes.json();
-          setCharter(charterData.charter);
+          const charterPayload = await charterRes.json();
+          setCharter(charterPayload.data?.charter ?? null);
         }
 
         const outlineRes = await fetch(`/api/projects/${project.id}/outline`);
         if (outlineRes.ok) {
-          const outlineData = await outlineRes.json();
-          if (outlineData.outline) {
-            setOutline(outlineData.outline);
-            if (outlineData.outline.volumes?.length > 0) {
-              setExpandedVolumes(new Set([outlineData.outline.volumes[0].id]));
+          const outlinePayload = await outlineRes.json();
+          if (outlinePayload.data?.outline) {
+            setOutline(outlinePayload.data.outline);
+            if (outlinePayload.data.outline.volumes?.length > 0) {
+              setExpandedVolumes(new Set([outlinePayload.data.outline.volumes[0].id]));
             }
           }
         }
@@ -89,8 +89,8 @@ export function OutlineView({ project, onSelectChapter, onRefreshChapters }: Out
         body: JSON.stringify({ projectId: project.id }),
       });
       if (res.ok) {
-        const data = await res.json();
-        const generatedOutline = data.outline;
+        const payload = await res.json();
+        const generatedOutline = payload.data?.outline;
 
         if (generatedOutline?.volumes) {
           generatedOutline.volumes.forEach((vol: VolumeOutlineType, idx: number) => {
@@ -130,8 +130,8 @@ export function OutlineView({ project, onSelectChapter, onRefreshChapters }: Out
         body: JSON.stringify({ volumes: outline.volumes }),
       });
       if (res.ok) {
-        const data = await res.json();
-        alert(`成功导入 ${data.count} 个章节到正文`);
+        const payload = await res.json();
+        alert(`成功导入 ${payload.data?.count ?? 0} 个章节到正文`);
         onRefreshChapters();
       }
     } catch (error) {

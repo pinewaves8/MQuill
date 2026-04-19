@@ -324,9 +324,10 @@ export function RichTextEditor({ chapter, segments, onSegmentsChange, onChapterU
           });
 
           if (res.ok) {
-            const data = await res.json();
-            onSegmentsChange(data.segments);
-            const wordCount = data.segments.reduce((sum: number, s: { content: string }) => sum + s.content.length, 0);
+            const payload = await res.json();
+            const savedSegments = payload.data?.segments || [];
+            onSegmentsChange(savedSegments);
+            const wordCount = savedSegments.reduce((sum: number, s: { content: string }) => sum + s.content.length, 0);
             onChapterUpdate?.({ ...currentChapter, title: currentTitle, wordCount });
             setLastSaved(new Date());
             setIsDirty(false);
@@ -385,9 +386,10 @@ export function RichTextEditor({ chapter, segments, onSegmentsChange, onChapterU
       });
 
       if (res.ok) {
-        const data = await res.json();
-        onSegmentsChange(data.segments);
-        const wordCount = data.segments.reduce((sum: number, s: { content: string }) => sum + s.content.length, 0);
+        const payload = await res.json();
+        const savedSegments = payload.data?.segments || [];
+        onSegmentsChange(savedSegments);
+        const wordCount = savedSegments.reduce((sum: number, s: { content: string }) => sum + s.content.length, 0);
         onChapterUpdate?.({ ...chapter!, title, wordCount });
         setLastSaved(new Date());
         setIsDirty(false);

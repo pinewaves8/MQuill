@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ProjectTag } from '@packages/shared-types';
+import { useState } from 'react';
 
 interface TagManagerProps {
   projectId: string;

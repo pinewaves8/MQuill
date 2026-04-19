@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     // Return updated scenes
     const scenes = await sceneStore.getByChapter(result.data.chapterId);
 
-    return NextResponse.json({ scenes });
+    return NextResponse.json({ data: { scenes } });
   } catch (error) {
     console.error('Error reordering scenes:', error);
     return NextResponse.json(

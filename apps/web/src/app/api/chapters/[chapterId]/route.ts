@@ -22,7 +22,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ chapter });
+    return NextResponse.json({ data: { chapter } });
   } catch (error) {
     console.error('Error fetching chapter:', error);
     return NextResponse.json(
@@ -58,7 +58,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ chapter });
+    return NextResponse.json({ data: { chapter } });
   } catch (error) {
     console.error('Error updating chapter:', error);
     return NextResponse.json(
@@ -84,7 +84,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ data: { success: true } });
   } catch (error) {
     console.error('Error deleting chapter:', error);
     return NextResponse.json(

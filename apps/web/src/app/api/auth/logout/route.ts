@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       await authStore.logout(sessionId);
     }
 
-    const response = NextResponse.json({ success: true });
+    const response = NextResponse.json({ data: { success: true } });
     response.cookies.delete('session');
 
     return response;

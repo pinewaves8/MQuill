@@ -33,8 +33,8 @@ export function VersionHistoryDrawer({
     try {
       const res = await fetch(`/api/chapters/${chapterId}/versions`);
       if (res.ok) {
-        const data = await res.json();
-        setVersions(data.versions || []);
+        const payload = await res.json();
+        setVersions(payload.data?.versions || []);
       }
     } catch (error) {
       console.error('Failed to fetch versions:', error);

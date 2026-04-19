@@ -44,34 +44,45 @@ const initialState = {
   error: null,
 };
 
-export const useEditorStore = create<EditorState>()((set) => ({
-  ...initialState,
+export const useEditorStore = create<EditorState>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  setProjectId: (projectId) => set({ projectId }),
+      setProjectId: (projectId) => set({ projectId }),
 
-  setChapterId: (chapterId) => set({ chapterId }),
+      setChapterId: (chapterId) => set({ chapterId }),
 
-  setProject: (project) => set({ project }),
+      setProject: (project) => set({ project }),
 
-  setChapters: (chapters) => set({ chapters }),
+      setChapters: (chapters) => set({ chapters }),
 
-  setCurrentChapter: (currentChapter) => set({ currentChapter }),
+      setCurrentChapter: (currentChapter) => set({ currentChapter }),
 
-  setDraftSegments: (draftSegments) => set({ draftSegments, isDirty: false }),
+      setDraftSegments: (draftSegments) => set({ draftSegments, isDirty: false }),
 
-  updateDraftSegment: (segmentId, content) =>
-    set((state) => ({
-      draftSegments: state.draftSegments.map((seg) =>
-        seg.id === segmentId ? { ...seg, content } : seg
-      ),
-      isDirty: true,
-    })),
+      updateDraftSegment: (segmentId, content) =>
+        set((state) => ({
+          draftSegments: state.draftSegments.map((seg) =>
+            seg.id === segmentId ? { ...seg, content } : seg
+          ),
+          isDirty: true,
+        })),
 
-  setIsDirty: (isDirty) => set({ isDirty }),
+      setIsDirty: (isDirty) => set({ isDirty }),
 
-  setIsLoading: (isLoading) => set({ isLoading }),
+      setIsLoading: (isLoading) => set({ isLoading }),
 
-  setError: (error) => set({ error }),
+      setError: (error) => set({ error }),
 
-  reset: () => set(initialState),
-}));
+      reset: () => set(initialState),
+    }),
+    {
+      name: 'mquill-editor-state',
+      partialize: (state) => ({
+        projectId: state.projectId,
+        chapterId: state.chapterId,
+      }),
+    }
+  )
+);

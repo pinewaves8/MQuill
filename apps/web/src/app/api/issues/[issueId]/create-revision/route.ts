@@ -43,8 +43,10 @@ export async function POST(
     await issueStore.update(issueId, { status: 'in_revision' });
 
     return NextResponse.json({
-      revision,
-      issue: await issueStore.getById(issueId),
+      data: {
+        revision,
+        issue: await issueStore.getById(issueId),
+      },
     });
   } catch (error) {
     console.error('Error creating revision from issue:', error);

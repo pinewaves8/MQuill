@@ -23,7 +23,7 @@ export async function GET(
     const outlines = loadCollection<BookOutline>('outlines');
     const outline = outlines.find(o => o.projectId === projectId);
 
-    return NextResponse.json({ outline: outline || null });
+    return NextResponse.json({ data: { outline: outline || null } });
   } catch (error) {
     console.error('Error fetching outline:', error);
     return NextResponse.json({ error: 'Failed to fetch outline' }, { status: 500 });
@@ -62,7 +62,7 @@ export async function POST(
 
     saveCollection('outlines', outlines);
 
-    return NextResponse.json({ outline });
+    return NextResponse.json({ data: { outline } });
   } catch (error) {
     console.error('Error saving outline:', error);
     return NextResponse.json({ error: 'Failed to save outline' }, { status: 500 });

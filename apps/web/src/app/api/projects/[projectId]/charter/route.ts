@@ -20,10 +20,10 @@ export async function GET(
     const charter = allCharters.find(c => c.projectId === projectId);
 
     if (!charter) {
-      return NextResponse.json({ charter: null });
+      return NextResponse.json({ data: { charter: null } });
     }
 
-    return NextResponse.json({ charter });
+    return NextResponse.json({ data: { charter } });
   } catch (error) {
     console.error('Error fetching charter:', error);
     return NextResponse.json(

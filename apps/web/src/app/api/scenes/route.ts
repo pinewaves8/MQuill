@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
     const scenes = await sceneStore.getByChapter(chapterId);
 
-    return NextResponse.json({ scenes });
+    return NextResponse.json({ data: { scenes } });
   } catch (error) {
     console.error('Error fetching scenes:', error);
     return NextResponse.json(
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       status: 'draft',
     });
 
-    return NextResponse.json({ scene }, { status: 201 });
+    return NextResponse.json({ data: { scene } }, { status: 201 });
   } catch (error) {
     console.error('Error creating scene:', error);
     return NextResponse.json(

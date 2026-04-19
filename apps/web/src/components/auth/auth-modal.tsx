@@ -34,15 +34,18 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      const payload = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || '操作失败');
+        toast.error(payload.error || '操作失败');
         return;
       }
 
-      toast.success(mode === 'login' ? '登录成功' : '注册成功');
-      onSuccess(data.user);
+      if (payload.data?.user) {
+        toast.success(mode === 'login' ? '登录成功' : '注册成功');
+        onSuccess(payload.data.user);
+      }
+
       onClose();
       setEmail('');
       setPassword('');
@@ -80,7 +83,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         </button>
 
         <h2 className="text-2xl font-bold text-gray-900 mb-6">
-          {mode === 'login' ? '登录墨羽' : '注册账号'}
+          {mode === 'login' ? '登录墨翎' : '注册账号'}
         </h2>
 
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -21,7 +21,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ memory });
+    return NextResponse.json({ data: { memory } });
   } catch (error) {
     console.error('Error fetching memory:', error);
     return NextResponse.json(
@@ -49,7 +49,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ memory });
+    return NextResponse.json({ data: { memory } });
   } catch (error) {
     console.error('Error updating memory:', error);
     return NextResponse.json(
@@ -75,7 +75,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ data: { success: true } });
   } catch (error) {
     console.error('Error deleting memory:', error);
     return NextResponse.json(

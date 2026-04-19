@@ -78,19 +78,19 @@ export default function EditorPage() {
         // Fetch project
         const projectRes = await fetch(`/api/projects/${projectId}`);
         if (projectRes.ok) {
-          const projectData = await projectRes.json();
-          setProject(projectData.project);
+          const projectPayload = await projectRes.json();
+          setProject(projectPayload.data?.project ?? null);
         }
 
         // Fetch chapters
         const chaptersRes = await fetch(`/api/projects/${projectId}/chapters`);
         if (chaptersRes.ok) {
-          const chaptersData = await chaptersRes.json();
-          setChapters(chaptersData.chapters || []);
+          const chaptersPayload = await chaptersRes.json();
+          setChapters(chaptersPayload.data?.chapters || []);
 
           // Select first chapter by default
-          if (chaptersData.chapters?.length > 0) {
-            setCurrentChapter(chaptersData.chapters[0]);
+          if (chaptersPayload.data?.chapters?.length > 0) {
+            setCurrentChapter(chaptersPayload.data.chapters[0]);
           }
         }
       } catch (error) {
@@ -114,8 +114,8 @@ export default function EditorPage() {
         try {
           const res = await fetch(`/api/scenes?chapterId=${currentChapter.id}`);
           if (res.ok) {
-            const data = await res.json();
-            setScenes(data.scenes || []);
+            const payload = await res.json();
+            setScenes(payload.data?.scenes || []);
           }
         } catch (error) {
           console.error('Failed to fetch scenes:', error);
@@ -133,8 +133,8 @@ export default function EditorPage() {
         try {
           const res = await fetch(`/api/chapters/${currentChapter.id}/draft`);
           if (res.ok) {
-            const data = await res.json();
-            setDraftSegments(data.segments || []);
+            const payload = await res.json();
+            setDraftSegments(payload.data?.segments || []);
           }
         } catch (error) {
           console.error('Failed to fetch draft:', error);
@@ -163,8 +163,8 @@ export default function EditorPage() {
         try {
           const res = await fetch(`/api/chapters/${currentChapter.id}/draft`);
           if (res.ok) {
-            const data = await res.json();
-            setDraftSegments(data.segments || []);
+            const payload = await res.json();
+            setDraftSegments(payload.data?.segments || []);
           }
         } catch (error) {
           console.error('Failed to fetch draft:', error);
@@ -210,7 +210,7 @@ export default function EditorPage() {
             // Refresh chapters to update word counts
             fetch(`/api/projects/${projectId}/chapters`)
               .then((res) => res.json())
-              .then((data) => setChapters(data.chapters || []));
+              .then((payload) => setChapters(payload.data?.chapters || []));
           }}
         />
       )}
@@ -224,7 +224,7 @@ export default function EditorPage() {
             onRefreshChapters={() => {
               fetch(`/api/projects/${projectId}/chapters`)
                 .then((res) => res.json())
-                .then((data) => setChapters(data.chapters || []));
+                .then((payload) => setChapters(payload.data?.chapters || []));
             }}
           />
         ) : (
@@ -283,7 +283,7 @@ export default function EditorPage() {
             // Refresh after restore
             fetch(`/api/projects/${projectId}/chapters`)
               .then((res) => res.json())
-              .then((data) => setChapters(data.chapters || []));
+              .then((payload) => setChapters(payload.data?.chapters || []));
           }}
         />
       )}

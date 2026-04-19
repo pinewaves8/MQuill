@@ -129,8 +129,10 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
       });
 
       if (res.ok) {
-        const data = await res.json();
-        addScene(data.scene);
+        const payload = await res.json();
+        if (payload.data?.scene) {
+          addScene(payload.data.scene);
+        }
       }
     } catch (error) {
       console.error('Failed to create scene:', error);
@@ -148,8 +150,10 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
       });
 
       if (res.ok) {
-        const data = await res.json();
-        updateScene(sceneId, data.scene);
+        const payload = await res.json();
+        if (payload.data?.scene) {
+          updateScene(sceneId, payload.data.scene);
+        }
       }
     } catch (error) {
       console.error('Failed to update scene:', error);
@@ -179,8 +183,10 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
       });
 
       if (res.ok) {
-        const data = await res.json();
-        updateScene(sceneId, data.scene);
+        const payload = await res.json();
+        if (payload.data?.scene) {
+          updateScene(sceneId, payload.data.scene);
+        }
         onRefreshChapters?.();
         toast.success('正文生成成功');
       } else {
@@ -207,13 +213,13 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const payload = await res.json();
         // Add generated scenes to store and refresh
-        data.scenes.forEach((scene: SceneCard) => {
+        (payload.data?.scenes || []).forEach((scene: SceneCard) => {
           addScene(scene);
         });
         onRefreshChapters?.();
-        toast.success(`已生成 ${data.count} 个场景`);
+        toast.success(`已生成 ${payload.data?.count ?? 0} 个场景`);
       } else {
         const error = await res.json();
         toast.error(error.error || '生成失败，请重试');
@@ -240,8 +246,10 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
         });
 
         if (res.ok) {
-          const data = await res.json();
-          updateScene(scene.id, data.scene);
+          const payload = await res.json();
+          if (payload.data?.scene) {
+            updateScene(scene.id, payload.data.scene);
+          }
           successCount++;
         }
       }
@@ -293,8 +301,10 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
         body: JSON.stringify({ status: 'discarded' }),
       });
       if (res.ok) {
-        const data = await res.json();
-        updateScene(sceneId, data.scene);
+        const payload = await res.json();
+        if (payload.data?.scene) {
+          updateScene(sceneId, payload.data.scene);
+        }
       }
     } catch (error) {
       console.error('Failed to discard scene:', error);
@@ -309,8 +319,10 @@ export function ScenePanel({ projectId, chapterId, scenes, segments = [], onScen
         body: JSON.stringify({ status: 'draft' }),
       });
       if (res.ok) {
-        const data = await res.json();
-        updateScene(sceneId, data.scene);
+        const payload = await res.json();
+        if (payload.data?.scene) {
+          updateScene(sceneId, payload.data.scene);
+        }
       }
     } catch (error) {
       console.error('Failed to restore scene:', error);

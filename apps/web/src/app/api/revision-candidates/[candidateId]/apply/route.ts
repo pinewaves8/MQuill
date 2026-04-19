@@ -179,8 +179,10 @@ export async function POST(
     });
 
     return NextResponse.json({
-      success: true,
-      appliedMode: mode,
+      data: {
+        success: true,
+        appliedMode: mode,
+      },
     });
   } catch (error) {
     console.error('Error applying candidate:', error);

@@ -11,7 +11,7 @@ const DATA_FILE = path.join(DATA_DIR, 'store.json');
 
 interface StoreData {
   projects: unknown[];
-  tags: Record<string, unknown>;
+  tags: unknown[];
   charters: unknown[];
   chapters: unknown[];
   scenes: unknown[];
@@ -22,6 +22,9 @@ interface StoreData {
   candidates: unknown[];
   memories: unknown[];
   outlines: unknown[];
+  progress: unknown[];
+  users: unknown[];
+  sessions: unknown[];
 }
 
 // Ensure data directory exists
@@ -69,7 +72,7 @@ export function saveToFile(data: StoreData): void {
 function getEmptyStore(): StoreData {
   return {
     projects: [],
-    tags: {},
+    tags: [],
     charters: [],
     chapters: [],
     scenes: [],
@@ -80,6 +83,9 @@ function getEmptyStore(): StoreData {
     candidates: [],
     memories: [],
     outlines: [],
+    progress: [],
+    users: [],
+    sessions: [],
   };
 }
 
@@ -91,7 +97,7 @@ export function loadCollection<T>(collectionName: string): T[] {
 
 // Save specific collection to file
 export function saveCollection<T>(collectionName: string, items: T[]): void {
-  const data = loadFromFile() as unknown as Record<string, unknown>;
+  const data = loadFromFile() as unknown as Record<string, unknown[]>;
   data[collectionName] = items;
   saveToFile(data as unknown as StoreData);
 }

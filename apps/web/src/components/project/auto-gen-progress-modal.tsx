@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Project } from '@packages/shared-types';
 
 interface AutoGenProgressModalProps {
   isOpen: boolean;
   bookTitle: string;
   onCancel: () => void;
   onSwitchToManual: () => void;
-  onComplete: (project: any) => void;
+  project: Project | null;
+  onComplete: (project: Project) => void;
 }
 
 const STEPS = [
@@ -22,6 +24,7 @@ export function AutoGenProgressModal({
   bookTitle,
   onCancel,
   onSwitchToManual,
+  project,
   onComplete,
 }: AutoGenProgressModalProps) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -46,9 +49,10 @@ export function AutoGenProgressModal({
 
     const runStep = (index: number) => {
       if (index >= STEPS.length) {
-        // Complete - create project and navigate
         setTimeout(() => {
-          onComplete(null);
+          if (project) {
+            onComplete(project);
+          }
         }, 500);
         return;
       }
@@ -81,7 +85,7 @@ export function AutoGenProgressModal({
     return () => {
       timers.forEach(clearInterval);
     };
-  }, [isOpen]);
+  }, [isOpen, onComplete, project]);
 
   if (!isOpen) return null;
 

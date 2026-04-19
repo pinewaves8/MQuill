@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { CreateProjectInput } from '@/lib/validation/schemas';
+import { Project, BookType, TargetLength, CreationMode } from '@packages/shared-types';
 import { AutoGenProgressModal } from './auto-gen-progress-modal';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (project: any) => void;
+  onSuccess: (project: Project) => void;
 }
 
 const bookTypes = [
@@ -56,6 +57,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAutoGen, setShowAutoGen] = useState(false);
+  const [createdProject, setCreatedProject] = useState<Project | null>(null);
 
   if (!isOpen) return null;
 
@@ -85,12 +87,18 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
         throw new Error(data.error || 'Failed to create project');
       }
 
-      const data = await response.json();
+      const payload = await response.json();
+      const project = payload.data?.project as Project | undefined;
+
+      if (!project) {
+        throw new Error('Project creation returned no project');
+      }
 
       if (formData.mode === 'auto') {
+        setCreatedProject(project);
         setShowAutoGen(true);
       } else {
-        onSuccess(data.project);
+        onSuccess(project);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -99,7 +107,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
     }
   };
 
-  const handleAutoGenComplete = (project: any) => {
+  const handleAutoGenComplete = (project: Project) => {
     setShowAutoGen(false);
     onSuccess(project);
   };
@@ -165,7 +173,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
                   <label className="block text-sm font-medium text-gray-700 mb-2">书籍类型</label>
                   <select
                     value={formData.bookType}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, bookType: e.target.value as any }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, bookType: e.target.value as BookType }))}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-100 outline-none transition-all bg-white"
                   >
                     {bookTypes.map((type) => (
@@ -197,7 +205,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
                   <label className="block text-sm font-medium text-gray-700 mb-2">目标篇幅</label>
                   <select
                     value={formData.targetLength}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, targetLength: e.target.value as any }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, targetLength: e.target.value as TargetLength }))}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-100 outline-none transition-all bg-white"
                   >
                     {targetLengths.map((len) => (
@@ -211,7 +219,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
                   <label className="block text-sm font-medium text-gray-700 mb-2">创作模式</label>
                   <select
                     value={formData.mode}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, mode: e.target.value as any }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, mode: e.target.value as CreationMode }))}
                     className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-gray-900 focus:ring-2 focus:ring-gray-100 outline-none transition-all bg-white"
                   >
                     {modes.map((mode) => (
@@ -318,12 +326,13 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
     <AutoGenProgressModal
       isOpen={showAutoGen}
       bookTitle={formData.title}
+      project={createdProject}
       onCancel={handleCancelAutoGen}
       onSwitchToManual={() => {
         setShowAutoGen(false);
         setFormData((prev) => ({ ...prev, mode: 'co_create' }));
       }}
-      onComplete={onSuccess}
+      onComplete={handleAutoGenComplete}
     />
     </>
   );

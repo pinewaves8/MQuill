@@ -86,7 +86,7 @@ ${text.slice(0, 300)}
       };
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json({ data: result });
   } catch (error) {
     console.error('Error generating suggestion:', error);
     return NextResponse.json({ error: 'Failed to generate suggestion' }, { status: 500 });

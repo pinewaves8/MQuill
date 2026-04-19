@@ -925,6 +925,8 @@ export function ensureSeeded(): void {
   if (seeded) return;
   seeded = true;
   seedDevelopmentData().then((didSeed) => {
-    if (didSeed) console.log('[MQuill] Demo project seeded');
+    if (didSeed) {
+      console.error('[MQuill] Demo project seeded');
+    }
   });
 }

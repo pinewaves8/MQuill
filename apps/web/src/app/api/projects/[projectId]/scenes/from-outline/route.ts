@@ -96,9 +96,11 @@ export async function POST(
     );
 
     return NextResponse.json({
-      chapterId,
-      scenes: createdScenes,
-      count: createdScenes.length,
+      data: {
+        chapterId,
+        scenes: createdScenes,
+        count: createdScenes.length,
+      },
     });
   } catch (error) {
     console.error('Error generating scenes from outline:', error);

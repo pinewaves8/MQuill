@@ -32,8 +32,8 @@ export default function DashboardPage() {
   const fetchProjects = async () => {
     try {
       const response = await fetch('/api/projects');
-      const data = await response.json();
-      setProjects(data.projects || []);
+      const payload = await response.json();
+      setProjects(payload.data?.projects || []);
     } catch (error) {
       console.error('Failed to fetch projects:', error);
     } finally {
@@ -44,8 +44,8 @@ export default function DashboardPage() {
   const fetchCurrentUser = async () => {
     try {
       const res = await fetch('/api/auth/me');
-      const data = await res.json();
-      setCurrentUser(data.user);
+      const payload = await res.json();
+      setCurrentUser(payload.data?.user ?? null);
     } catch (error) {
       console.error('Failed to fetch user:', error);
     } finally {

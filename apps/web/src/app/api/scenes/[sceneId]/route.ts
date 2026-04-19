@@ -22,7 +22,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ scene });
+    return NextResponse.json({ data: { scene } });
   } catch (error) {
     console.error('Error fetching scene:', error);
     return NextResponse.json(
@@ -58,7 +58,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ scene });
+    return NextResponse.json({ data: { scene } });
   } catch (error) {
     console.error('Error updating scene:', error);
     return NextResponse.json(
@@ -84,7 +84,7 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ data: { success: true } });
   } catch (error) {
     console.error('Error deleting scene:', error);
     return NextResponse.json(

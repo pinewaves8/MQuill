@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { projectStore, writingProgressStore, chapterStore, draftSegmentStore } from '@/lib/db/projects-store';
+import { projectStore, writingProgressStore, chapterStore } from '@/lib/db/projects-store';
+import { TargetLength } from '@packages/shared-types';
 
 interface RouteParams {
   params: Promise<{ projectId: string }>;
@@ -28,16 +29,18 @@ export async function GET(
     const stats = await writingProgressStore.getStats(projectId);
 
     // Calculate target word count based on targetLength
-    const targetWordCountMap = { short: 30000, mid: 65000, long: 100000 };
+    const targetWordCountMap: Record<TargetLength, number> = { short: 30000, mid: 65000, long: 100000 };
     const targetWordCount = targetWordCountMap[project.targetLength] || 100000;
 
     return NextResponse.json({
-      projectId,
-      targetWordCount,
-      currentWordCount,
-      progress: Math.round((currentWordCount / targetWordCount) * 100),
-      dailyProgress: dailyProgress.slice(0, 30), // Last 30 days
-      stats,
+      data: {
+        projectId,
+        targetWordCount,
+        currentWordCount,
+        progress: Math.round((currentWordCount / targetWordCount) * 100),
+        dailyProgress: dailyProgress.slice(0, 30),
+        stats,
+      },
     });
   } catch (error) {
     console.error('Error fetching progress:', error);
@@ -74,7 +77,7 @@ export async function POST(
     const today = new Date().toISOString().split('T')[0];
     const progress = await writingProgressStore.upsertDay(projectId, today, wordsWritten, currentWordCount);
 
-    return NextResponse.json({ progress });
+    return NextResponse.json({ data: { progress } });
   } catch (error) {
     console.error('Error recording progress:', error);
     return NextResponse.json({ error: 'Failed to record progress' }, { status: 500 });

@@ -63,8 +63,10 @@ export async function POST(
     );
 
     return NextResponse.json({
-      chapterId,
-      scenes: createdScenes,
+      data: {
+        chapterId,
+        scenes: createdScenes,
+      },
     });
   } catch (error) {
     console.error('Error planning scenes:', error);

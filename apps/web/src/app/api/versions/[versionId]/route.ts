@@ -21,7 +21,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ version });
+    return NextResponse.json({ data: { version } });
   } catch (error) {
     console.error('Error fetching version:', error);
     return NextResponse.json(
@@ -95,8 +95,10 @@ export async function POST(
     }
 
     return NextResponse.json({
-      success: true,
-      restoredVersion: version,
+      data: {
+        success: true,
+        restoredVersion: version,
+      },
     });
   } catch (error) {
     console.error('Error restoring version:', error);

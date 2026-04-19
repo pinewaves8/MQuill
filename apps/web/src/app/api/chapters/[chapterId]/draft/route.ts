@@ -26,9 +26,11 @@ export async function GET(
     const totalWordCount = segments.reduce((sum, seg) => sum + seg.content.length, 0);
 
     return NextResponse.json({
-      chapterId,
-      segments,
-      totalWordCount,
+      data: {
+        chapterId,
+        segments,
+        totalWordCount,
+      },
     });
   } catch (error) {
     console.error('Error fetching draft:', error);
@@ -126,9 +128,11 @@ export async function PUT(
     });
 
     return NextResponse.json({
-      chapterId,
-      segments,
-      totalWordCount,
+      data: {
+        chapterId,
+        segments,
+        totalWordCount,
+      },
     });
   } catch (error) {
     console.error('Error saving draft:', error);

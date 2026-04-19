@@ -116,8 +116,8 @@ export function TextEditor({ chapter, segments, onSegmentsChange, onChapterUpdat
       });
 
       if (res.ok) {
-        const data = await res.json();
-        onSegmentsChange(data.segments);
+        const payload = await res.json();
+        onSegmentsChange(payload.data?.segments || []);
         // Update chapter word count in sidebar
         const wordCount = content.length;
         onChapterUpdate?.({ ...chapter!, title, wordCount });

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       memories = await memoryStore.getByProject(projectId, memoryType || undefined);
     }
 
-    return NextResponse.json({ memories });
+    return NextResponse.json({ data: { memories } });
   } catch (error) {
     console.error('Error fetching memories:', error);
     return NextResponse.json(
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       source: input.source || 'user',
     });
 
-    return NextResponse.json({ memory }, { status: 201 });
+    return NextResponse.json({ data: { memory } }, { status: 201 });
   } catch (error) {
     console.error('Error creating memory:', error);
     return NextResponse.json(

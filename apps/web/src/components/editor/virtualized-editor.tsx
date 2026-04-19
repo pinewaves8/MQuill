@@ -135,8 +135,8 @@ export function VirtualizedEditor({
       });
 
       if (res.ok) {
-        const data = await res.json();
-        onSegmentsChange(data.segments);
+        const payload = await res.json();
+        onSegmentsChange(payload.data?.segments || []);
         const wordCount = content.length;
         onChapterUpdate?.({ ...chapter!, title, wordCount });
         setLastSaved(new Date());

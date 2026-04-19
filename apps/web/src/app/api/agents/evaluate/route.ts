@@ -58,9 +58,11 @@ export async function POST(
     );
 
     return NextResponse.json({
-      chapterId,
-      scoreSummary,
-      issues: createdIssues,
+      data: {
+        chapterId,
+        scoreSummary,
+        issues: createdIssues,
+      },
     });
   } catch (error) {
     console.error('Error evaluating chapter:', error);

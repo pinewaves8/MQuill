@@ -48,8 +48,10 @@ export async function POST(
     await sceneStore.update(sceneId, { status: 'generated' });
 
     return NextResponse.json({
-      segment,
-      scene: await sceneStore.getById(sceneId),
+      data: {
+        segment,
+        scene: await sceneStore.getById(sceneId),
+      },
     });
   } catch (error) {
     console.error('Error generating draft:', error);

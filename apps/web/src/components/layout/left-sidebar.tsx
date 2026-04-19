@@ -192,13 +192,15 @@ export function LeftSidebar({
                       }),
                     });
                     if (res.ok) {
-                      const data = await res.json();
+                      const payload = await res.json();
                       const chaptersRes = await fetch(`/api/projects/${projectId}/chapters`);
                       if (chaptersRes.ok) {
-                        const chaptersData = await chaptersRes.json();
-                        window.dispatchEvent(new CustomEvent('chapters-refresh', { detail: chaptersData.chapters }));
+                        const chaptersPayload = await chaptersRes.json();
+                        window.dispatchEvent(new CustomEvent('chapters-refresh', { detail: chaptersPayload.data?.chapters || [] }));
                       }
-                      onSelectChapter(data.chapter);
+                      if (payload.data?.chapter) {
+                        onSelectChapter(payload.data.chapter);
+                      }
                     }
                   } catch (error) {
                     console.error('Failed to create chapter:', error);

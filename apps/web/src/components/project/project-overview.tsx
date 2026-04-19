@@ -33,8 +33,8 @@ export function ProjectOverview({ project }: ProjectOverviewProps) {
       try {
         // Fetch chapters
         const chaptersRes = await fetch(`/api/projects/${project.id}/chapters`);
-        const chaptersData = chaptersRes.ok ? await chaptersRes.json() : { chapters: [] };
-        const chapters: Chapter[] = chaptersData.chapters || [];
+        const chaptersPayload = chaptersRes.ok ? await chaptersRes.json() : { data: { chapters: [] } };
+        const chapters: Chapter[] = chaptersPayload.data?.chapters || [];
 
         // Fetch all scenes and issues for each chapter
         let totalScenes = 0;
@@ -48,15 +48,15 @@ export function ProjectOverview({ project }: ProjectOverviewProps) {
 
           // Fetch scenes
           const scenesRes = await fetch(`/api/scenes?chapterId=${chapter.id}`);
-          const scenesData = scenesRes.ok ? await scenesRes.json() : { scenes: [] };
-          const scenes: SceneCard[] = scenesData.scenes || [];
+          const scenesPayload = scenesRes.ok ? await scenesRes.json() : { data: { scenes: [] } };
+          const scenes: SceneCard[] = scenesPayload.data?.scenes || [];
           totalScenes += scenes.length;
           generatedScenes += scenes.filter((s) => s.status === 'generated').length;
 
           // Fetch issues
           const issuesRes = await fetch(`/api/issues?chapterId=${chapter.id}`);
-          const issuesData = issuesRes.ok ? await issuesRes.json() : { issues: [] };
-          const issues: EvaluationIssue[] = issuesData.issues || [];
+          const issuesPayload = issuesRes.ok ? await issuesRes.json() : { data: { issues: [] } };
+          const issues: EvaluationIssue[] = issuesPayload.data?.issues || [];
           openIssues += issues.filter((i) => i.status === 'open').length;
           highSeverityIssues += issues.filter((i) => i.severity === 'high' && i.status === 'open').length;
         }

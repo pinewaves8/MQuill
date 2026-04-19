@@ -14,7 +14,7 @@ export async function GET(
     const { chapterId } = await params;
     const versions = await versionStore.getByChapter(chapterId);
 
-    return NextResponse.json({ versions });
+    return NextResponse.json({ data: { versions } });
   } catch (error) {
     console.error('Error fetching versions:', error);
     return NextResponse.json(

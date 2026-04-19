@@ -57,9 +57,11 @@ export async function POST(
     );
 
     return NextResponse.json({
-      projectId,
-      charter: result.charter,
-      memories: createdMemories,
+      data: {
+        projectId,
+        charter: result.charter,
+        memories: createdMemories,
+      },
     });
   } catch (error) {
     console.error('Error bootstrapping project:', error);

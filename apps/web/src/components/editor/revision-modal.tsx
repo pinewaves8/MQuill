@@ -157,7 +157,8 @@ export function RevisionModal() {
         }),
       });
       if (response.ok) {
-        const data = await response.json();
+        const payload = await response.json();
+        const data = payload.data ?? {};
         if (data.suggestion) {
           setSuggestionText(data.suggestion);
         }
@@ -205,7 +206,12 @@ export function RevisionModal() {
         throw new Error('创建修订任务失败');
       }
 
-      const { revision } = await createRes.json();
+      const createPayload = await createRes.json();
+      const revision = createPayload.data?.revision;
+
+      if (!revision) {
+        throw new Error('淇浠诲姟杩斿洖鏃犳晥');
+      }
 
       const runRes = await fetch(`/api/revisions/${revision.id}/run`, {
         method: 'POST',
@@ -215,7 +221,12 @@ export function RevisionModal() {
         throw new Error('运行修订失败');
       }
 
-      const { candidate } = await runRes.json();
+      const runPayload = await runRes.json();
+      const candidate = runPayload.data?.candidate;
+
+      if (!candidate) {
+        throw new Error('淇鍊欓€夌杩斿洖鏃犳晥');
+      }
       setCandidateText(candidate.candidateText);
       setCandidateId(candidate.id);
     } catch (err) {

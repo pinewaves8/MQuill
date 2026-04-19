@@ -26,13 +26,13 @@ export default function VersionsPage() {
       try {
         const chaptersRes = await fetch(`/api/projects/${projectId}/chapters`);
         if (chaptersRes.ok) {
-          const data = await chaptersRes.json();
-          if (data.chapters?.length > 0) {
-            const chapterId = data.chapters[0].id;
+          const payload = await chaptersRes.json();
+          if (payload.data?.chapters?.length > 0) {
+            const chapterId = payload.data.chapters[0].id;
             const versionsRes = await fetch(`/api/chapters/${chapterId}/versions`);
             if (versionsRes.ok) {
-              const versionsData = await versionsRes.json();
-              setVersions(versionsData.versions || []);
+              const versionsPayload = await versionsRes.json();
+              setVersions(versionsPayload.data?.versions || []);
             }
           }
         }
@@ -61,8 +61,8 @@ export default function VersionsPage() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setCompareResult(data);
+        const payload = await res.json();
+        setCompareResult(payload.data ?? null);
       }
     } catch (error) {
       console.error('Failed to compare versions:', error);

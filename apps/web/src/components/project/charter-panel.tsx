@@ -39,15 +39,15 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
       // Fetch charter
       const charterRes = await fetch(`/api/projects/${projectId}/charter`);
       if (charterRes.ok) {
-        const charterData = await charterRes.json();
-        setCharter(charterData.charter);
+        const charterPayload = await charterRes.json();
+        setCharter(charterPayload.data?.charter ?? null);
       }
 
       // Fetch memories
       const memoriesRes = await fetch(`/api/memories?projectId=${projectId}`);
       if (memoriesRes.ok) {
-        const memoriesData = await memoriesRes.json();
-        setMemories(memoriesData.memories || []);
+        const memoriesPayload = await memoriesRes.json();
+        setMemories(memoriesPayload.data?.memories || []);
       }
     } catch (error) {
       console.error('Failed to fetch charter data:', error);
@@ -64,9 +64,9 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setCharter(data.charter);
-        setMemories(data.memories || []);
+        const payload = await res.json();
+        setCharter(payload.data?.charter ?? null);
+        setMemories(payload.data?.memories || []);
         toast.success('项目 Charter 生成成功');
       } else {
         toast.error('生成失败，请重试');
@@ -107,9 +107,9 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const payload = await res.json();
         setMemories((prev) =>
-          prev.map((m) => (m.id === memoryId ? data.memory : m))
+          prev.map((m) => (m.id === memoryId ? payload.data?.memory ?? m : m))
         );
         setEditingMemory(null);
         toast.success('记忆已更新');
@@ -136,8 +136,10 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setMemories((prev) => [data.memory, ...prev]);
+        const payload = await res.json();
+        if (payload.data?.memory) {
+          setMemories((prev) => [payload.data.memory, ...prev]);
+        }
         setShowAddMemory(false);
         toast.success('记忆已添加');
       }

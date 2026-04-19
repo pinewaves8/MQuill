@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { VersionRecord } from '@packages/shared-types';
 
 interface VersionState {
@@ -34,29 +35,43 @@ const initialState = {
   isDrawerOpen: false,
 };
 
-export const useVersionStore = create<VersionState>()((set) => ({
-  ...initialState,
+export const useVersionStore = create<VersionState>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  setVersions: (versions) => set({ versions }),
+      setVersions: (versions) => set({ versions }),
 
-  addVersion: (version) =>
-    set((state) => ({ versions: [version, ...state.versions] })),
+      addVersion: (version) =>
+        set((state) => ({ versions: [version, ...state.versions] })),
 
-  setCompareLeftId: (compareLeftId) => set({ compareLeftId }),
+      setCompareLeftId: (compareLeftId) => set({ compareLeftId }),
 
-  setCompareRightId: (compareRightId) => set({ compareRightId }),
+      setCompareRightId: (compareRightId) => set({ compareRightId }),
 
-  setDiffMode: (diffMode) => set({ diffMode }),
+      setDiffMode: (diffMode) => set({ diffMode }),
 
-  setShowOnlyChanges: (showOnlyChanges) => set({ showOnlyChanges }),
+      setShowOnlyChanges: (showOnlyChanges) => set({ showOnlyChanges }),
 
-  toggleShowOnlyChanges: () =>
-    set((state) => ({ showOnlyChanges: !state.showOnlyChanges })),
+      toggleShowOnlyChanges: () =>
+        set((state) => ({ showOnlyChanges: !state.showOnlyChanges })),
 
-  setIsDrawerOpen: (isDrawerOpen) => set({ isDrawerOpen }),
+      setIsDrawerOpen: (isDrawerOpen) => set({ isDrawerOpen }),
 
-  toggleDrawer: () =>
-    set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
+      toggleDrawer: () =>
+        set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
 
-  reset: () => set(initialState),
-}));
+      reset: () => set(initialState),
+    }),
+    {
+      name: 'mquill-version-state',
+      partialize: (state) => ({
+        compareLeftId: state.compareLeftId,
+        compareRightId: state.compareRightId,
+        diffMode: state.diffMode,
+        showOnlyChanges: state.showOnlyChanges,
+        isDrawerOpen: state.isDrawerOpen,
+      }),
+    }
+  )
+);

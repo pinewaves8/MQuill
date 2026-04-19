@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       })
     );
 
-    return NextResponse.json({ revisions: revisionsWithCandidates });
+    return NextResponse.json({ data: { revisions: revisionsWithCandidates } });
   } catch (error) {
     console.error('Error fetching revisions:', error);
     return NextResponse.json(
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       createdBy: input.createdBy || 'user',
     });
 
-    return NextResponse.json({ revision }, { status: 201 });
+    return NextResponse.json({ data: { revision } }, { status: 201 });
   } catch (error) {
     console.error('Error creating revision:', error);
     return NextResponse.json(

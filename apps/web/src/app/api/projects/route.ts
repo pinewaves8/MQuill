@@ -19,7 +19,7 @@ export async function GET() {
       })
     );
 
-    return NextResponse.json({ projects: projectsWithTags });
+    return NextResponse.json({ data: { projects: projectsWithTags } });
   } catch (error) {
     console.error('Error fetching projects:', error);
     return NextResponse.json(
@@ -76,9 +76,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        project: {
-          ...project,
-          tags: tags.map((t) => t.tag),
+        data: {
+          project: {
+            ...project,
+            tags: tags.map((t) => t.tag),
+          },
         },
       },
       { status: 201 }

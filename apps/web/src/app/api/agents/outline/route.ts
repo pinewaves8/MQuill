@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     saveCollection('outlines', outlines);
 
-    return NextResponse.json({ outline: bookOutline });
+    return NextResponse.json({ data: { outline: bookOutline } });
   } catch (error) {
     console.error('Error generating outline:', error);
     return NextResponse.json({ error: 'Failed to generate outline' }, { status: 500 });

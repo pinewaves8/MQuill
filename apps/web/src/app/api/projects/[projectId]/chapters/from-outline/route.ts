@@ -53,8 +53,10 @@ export async function POST(
     }
 
     return NextResponse.json({
-      createdChapters,
-      count: createdChapters.length,
+      data: {
+        createdChapters,
+        count: createdChapters.length,
+      },
     });
   } catch (error) {
     console.error('Error importing chapters from outline:', error);

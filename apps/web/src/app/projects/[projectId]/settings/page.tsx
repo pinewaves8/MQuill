@@ -77,8 +77,8 @@ export default function ProjectSettingsPage() {
       try {
         const res = await fetch(`/api/projects/${projectId}`);
         if (res.ok) {
-          const data = await res.json();
-          const p = data.project as Project;
+          const payload = await res.json();
+          const p = payload.data?.project as Project;
           setProject(p);
           setTitle(p.title || '');
           setDescription(p.description || '');
@@ -104,8 +104,8 @@ export default function ProjectSettingsPage() {
       try {
         const res = await fetch(`/api/projects/${projectId}/progress`);
         if (res.ok) {
-          const data = await res.json();
-          setProgressData(data);
+          const payload = await res.json();
+          setProgressData(payload.data ?? null);
         }
       } catch (error) {
         console.error('Failed to fetch progress:', error);
@@ -138,8 +138,8 @@ export default function ProjectSettingsPage() {
       });
 
       if (res.ok) {
-        const data = await res.json();
-        setProject(data.project);
+        const payload = await res.json();
+        setProject(payload.data?.project ?? null);
         setSaveMessage('保存成功');
         setTimeout(() => setSaveMessage(null), 3000);
       } else {

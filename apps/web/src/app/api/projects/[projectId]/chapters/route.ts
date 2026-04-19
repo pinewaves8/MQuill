@@ -15,7 +15,7 @@ export async function GET(
     const { projectId } = await params;
     const chapters = await chapterStore.getByProject(projectId);
 
-    return NextResponse.json({ chapters });
+    return NextResponse.json({ data: { chapters } });
   } catch (error) {
     console.error('Error fetching chapters:', error);
     return NextResponse.json(
@@ -63,7 +63,7 @@ export async function POST(
       status: 'planned',
     });
 
-    return NextResponse.json({ chapter }, { status: 201 });
+    return NextResponse.json({ data: { chapter } }, { status: 201 });
   } catch (error) {
     console.error('Error creating chapter:', error);
     return NextResponse.json(

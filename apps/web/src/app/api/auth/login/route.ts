@@ -18,10 +18,12 @@ export async function POST(request: Request) {
 
     // Set session cookie
     const response = NextResponse.json({
-      user: {
-        id: result.user.id,
-        email: result.user.email,
-        name: result.user.name,
+      data: {
+        user: {
+          id: result.user.id,
+          email: result.user.email,
+          name: result.user.name,
+        },
       },
     });
 

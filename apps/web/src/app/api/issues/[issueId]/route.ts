@@ -22,7 +22,7 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ issue });
+    return NextResponse.json({ data: { issue } });
   } catch (error) {
     console.error('Error fetching issue:', error);
     return NextResponse.json(
@@ -58,7 +58,7 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ issue });
+    return NextResponse.json({ data: { issue } });
   } catch (error) {
     console.error('Error updating issue:', error);
     return NextResponse.json(

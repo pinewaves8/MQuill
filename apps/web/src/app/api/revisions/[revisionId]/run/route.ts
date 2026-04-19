@@ -76,8 +76,10 @@ export async function POST(
     await revisionStore.update(revisionId, { status: 'reviewed' });
 
     return NextResponse.json({
-      candidate,
-      originalText,
+      data: {
+        candidate,
+        originalText,
+      },
     });
   } catch (error) {
     console.error('Error running revision:', error);

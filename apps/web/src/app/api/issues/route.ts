@@ -18,11 +18,11 @@ export async function GET(request: Request) {
 
     if (chapterId) {
       const issues = await issueStore.getByChapter(chapterId);
-      return NextResponse.json({ issues });
+      return NextResponse.json({ data: { issues } });
     }
 
     // For project-level query, would need to add method to store
-    return NextResponse.json({ issues: [] });
+    return NextResponse.json({ data: { issues: [] } });
   } catch (error) {
     console.error('Error fetching issues:', error);
     return NextResponse.json(
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       status: 'open',
     });
 
-    return NextResponse.json({ issue }, { status: 201 });
+    return NextResponse.json({ data: { issue } }, { status: 201 });
   } catch (error) {
     console.error('Error creating issue:', error);
     return NextResponse.json(
