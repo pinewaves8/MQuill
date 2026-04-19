@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       applyMode: input.applyMode || 'replace',
       status: 'draft',
       linkedIssueId: input.linkedIssueId,
+      issueContext: input.issueContext,
       createdBy: input.createdBy || 'user',
     });
 

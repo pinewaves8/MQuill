@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -X POST http://localhost:3000/api/agents/outline -H \"Content-Type: application/json\" -d '{\"projectId\":\"b191ea8e-adae-4440-8e80-e1a6c555aba6\"}')",
+      "Bash(node -e \"const fs = require\\('fs'\\); const data = JSON.parse\\(fs.readFileSync\\('c:/tao/MQuill/apps/web/.data/store.json', 'utf-8'\\)\\); const outline = data.outlines.find\\(o => o.projectId === 'b191ea8e-adae-4440-8e80-e1a6c555aba6'\\); console.log\\('Outline found after API call:', !!outline\\);\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const data = JSON.parse\\(fs.readFileSync\\('c:/tao/MQuill/apps/web/.data/store.json', 'utf-8'\\)\\); console.log\\('All outline projectIds:', data.outlines.map\\(o => o.projectId\\)\\); console.log\\('Outlines count:', data.outlines.length\\);\")",
+      "Bash(node -e \"const d = JSON.parse\\(require\\('fs'\\).readFileSync\\(0, 'utf-8'\\)\\); console.log\\('Outline volumes:', d.outline?.volumes?.length\\);\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const data = JSON.parse\\(fs.readFileSync\\('c:/tao/MQuill/apps/web/.data/store.json', 'utf-8'\\)\\); console.log\\('Outlines in file:', data.outlines.map\\(o => o.projectId\\)\\);\")",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(curl -X POST http://localhost:3001/api/agents/outline -H \"Content-Type: application/json\" -d '{\"projectId\":\"b191ea8e-adae-4440-8e80-e1a6c555aba6\"}')",
+      "Bash(node -e \"const fs = require\\('fs'\\); const data = JSON.parse\\(fs.readFileSync\\('c:/tao/MQuill/apps/web/.data/store.json', 'utf-8'\\)\\); console.log\\('Outlines count:', data.outlines.length\\); console.log\\('Project IDs:', data.outlines.map\\(o => o.projectId\\)\\);\")",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(curl -X POST http://localhost:3003/api/agents/outline -H \"Content-Type: application/json\" -d '{\"projectId\":\"b191ea8e-adae-4440-8e80-e1a6c555aba6\"}')",
+      "Bash(node -e ' *)",
+      "Bash(npx tsx *)"
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { chapterStore, draftSegmentStore, issueStore } from '@/lib/db/projects-store';
+import { chapterStore, draftSegmentStore, issueStore, revisionStore } from '@/lib/db/projects-store';
 import { criticAgent } from '@/lib/agents/critic-agent';
 
 interface RouteParams {
@@ -48,7 +48,7 @@ export async function POST(
       .sort(([, a], [, b]) => (a as number) - (b as number))[0];
     const overallIssueType = lowestDim ? (lowestDim[0] as any) : 'style';
 
-    // Create issues in the store from evaluation result
+    // Build revision items from evaluation result
     const revisionItems = [
       ...evaluationResult.revision.must_fix.map((text) => ({
         text,
@@ -60,8 +60,28 @@ export async function POST(
       })),
     ];
 
+    // Check for existing issues to avoid duplicates
+    const existingIssues = await issueStore.getByChapter(chapterId);
+    const existingSuggestions = new Set(existingIssues.map((i) => i.suggestion));
+
+    // Deduplicate: only keep revisionItems that don't already exist
+    const newRevisionItems = revisionItems.filter((item) => !existingSuggestions.has(item.text));
+
+    if (newRevisionItems.length === 0) {
+      return NextResponse.json({
+        data: {
+          chapterId,
+          evaluationResult,
+          scoreSummary: evaluationResult.scores,
+          issues: existingIssues,
+          revisions: [],
+          message: 'No new issues found (all already exist)',
+        },
+      });
+    }
+
     const createdIssues = await Promise.all(
-      revisionItems.map((item) =>
+      newRevisionItems.map((item) =>
         issueStore.create({
           projectId: chapter.projectId,
           chapterId,
@@ -77,12 +97,39 @@ export async function POST(
       )
     );
 
+    // Auto-create revision tasks for must_fix items
+    const mustFixIssues = createdIssues.filter((issue) => issue.revisionLevel === 'must_fix');
+    const createdRevisions = await Promise.all(
+      mustFixIssues.map((issue) =>
+        revisionStore.create({
+          projectId: chapter.projectId,
+          chapterId,
+          targetScope: 'segment',
+          suggestion: issue.suggestion || issue.title,
+          goals: evaluationResult.majorIssues,
+          constraints: [],
+          applyMode: 'replace',
+          linkedIssueId: issue.id,
+          issueContext: {
+            excerpt: issue.excerpt,
+            reason: issue.reason,
+            suggestion: issue.suggestion,
+            tags: issue.tags,
+            severity: issue.severity,
+          },
+          createdBy: 'agent',
+          status: 'draft',
+        })
+      )
+    );
+
     return NextResponse.json({
       data: {
         chapterId,
         evaluationResult,
         scoreSummary: evaluationResult.scores,
         issues: createdIssues,
+        revisions: createdRevisions,
       },
     });
   } catch (error) {

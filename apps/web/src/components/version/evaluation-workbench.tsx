@@ -181,10 +181,14 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
           const payload = await res.json();
           const fullRevision = payload.data?.revision;
           if (fullRevision) {
-            const { setCurrentRevision, setGoals, setSuggestions } = useRevisionStore.getState();
+            const { setCurrentRevision, setGoals, setSuggestions, setSuggestionText } = useRevisionStore.getState();
             setCurrentRevision(fullRevision);
-            if (fullRevision.issueContext?.suggestion) {
-              setSuggestions([fullRevision.issueContext.suggestion]);
+
+            // Set suggestion from issueContext to both store suggestions and local textarea
+            const suggestion = fullRevision.issueContext?.suggestion || issue.suggestion || '';
+            if (suggestion) {
+              setSuggestions([suggestion]);
+              setSuggestionText(suggestion);
             }
             if (fullRevision.goals?.length) {
               setGoals(fullRevision.goals);
@@ -209,6 +213,13 @@ export function EvaluationWorkbench({ projectId, chapters, currentChapter, onClo
       } catch (error) {
         console.error('Failed to fetch revision:', error);
       }
+    }
+
+    // Fallback: open modal with issue suggestion
+    const { setSuggestionText } = useRevisionStore.getState();
+    const suggestion = issue.suggestion || '';
+    if (suggestion) {
+      setSuggestionText(suggestion);
     }
 
     // Fallback: open modal with chapter content if no excerpt

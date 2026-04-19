@@ -96,10 +96,12 @@ export function RevisionModal() {
     selectedText,
     targetScope,
     suggestions,
+    suggestionText,
     goals,
     constraints,
     applyMode,
     setSuggestions,
+    setSuggestionText,
     setGoals,
     setConstraints,
     setApplyMode,
@@ -118,7 +120,6 @@ export function RevisionModal() {
   const [versionSummary, setVersionSummary] = useState('');
   const [goalText, setGoalText] = useState('');
   const [constraintText, setConstraintText] = useState('');
-  const [suggestionText, setSuggestionText] = useState('');
   const [isSuggesting, setIsSuggesting] = useState(false);
 
   // When candidate text changes, rebuild paragraph choices

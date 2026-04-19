@@ -76,6 +76,14 @@ export const ReorderScenesSchema = z.object({
 });
 
 // Revision validation schemas
+const IssueContextSchema = z.object({
+  excerpt: z.string().optional(),
+  reason: z.string().optional(),
+  suggestion: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  severity: z.enum(['low', 'medium', 'high']).optional(),
+}).optional();
+
 export const CreateRevisionSchema = z.object({
   projectId: z.string().uuid(),
   chapterId: z.string().uuid(),
@@ -87,6 +95,7 @@ export const CreateRevisionSchema = z.object({
   constraints: z.array(z.string()).optional(),
   applyMode: z.enum(['replace', 'append', 'branch']).default('replace'),
   linkedIssueId: z.string().uuid().optional(),
+  issueContext: IssueContextSchema,
   createdBy: z.enum(['user', 'agent']).default('user'),
 });
 

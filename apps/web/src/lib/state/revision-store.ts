@@ -19,6 +19,7 @@ interface RevisionState {
 
   // Form inputs
   suggestions: string[];
+  suggestionText: string;  // Free-form suggestion text for textarea
   goals: string[];
   constraints: string[];
   applyMode: 'replace' | 'append' | 'branch';
@@ -34,6 +35,7 @@ interface RevisionState {
   addCandidate: (candidate: RevisionCandidate) => void;
   setCurrentCandidateIndex: (index: number) => void;
   setSuggestions: (suggestions: string[]) => void;
+  setSuggestionText: (text: string) => void;
   setGoals: (goals: string[]) => void;
   setConstraints: (constraints: string[]) => void;
   setApplyMode: (mode: 'replace' | 'append' | 'branch') => void;
@@ -51,6 +53,7 @@ const initialState = {
   candidates: [],
   currentCandidateIndex: -1,
   suggestions: [],
+  suggestionText: '',
   goals: [],
   constraints: [],
   applyMode: 'replace' as const,
@@ -92,6 +95,8 @@ export const useRevisionStore = create<RevisionState>()(
 
       setSuggestions: (suggestions) => set({ suggestions }),
 
+      setSuggestionText: (suggestionText) => set({ suggestionText }),
+
       setGoals: (goals) => set({ goals }),
 
       setConstraints: (constraints) => set({ constraints }),
@@ -109,6 +114,7 @@ export const useRevisionStore = create<RevisionState>()(
         selectionRange: state.selectionRange,
         targetScope: state.targetScope,
         suggestions: state.suggestions,
+        suggestionText: state.suggestionText,
         goals: state.goals,
         constraints: state.constraints,
         applyMode: state.applyMode,

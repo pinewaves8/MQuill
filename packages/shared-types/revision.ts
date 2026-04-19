@@ -3,6 +3,15 @@ export type RevisionStatus = 'draft' | 'running' | 'reviewed' | 'applied' | 'rej
 export type RevisionTargetScope = 'selection' | 'segment' | 'chapter';
 export type ApplyMode = 'replace' | 'append' | 'branch';
 
+// Context from linked issue for revision
+export interface IssueContext {
+  excerpt?: string;      // Original problem text
+  reason?: string;      // Why this is a problem
+  suggestion?: string;   // AI suggested fix
+  tags?: string[];      // Issue tags (e.g., 'ai_smell', 'low_tension')
+  severity?: 'low' | 'medium' | 'high';
+}
+
 export interface RevisionTask {
   id: string;
   projectId: string;
@@ -16,6 +25,7 @@ export interface RevisionTask {
   applyMode: ApplyMode;
   status: RevisionStatus;
   linkedIssueId?: string;
+  issueContext?: IssueContext;  // Full issue context for auto-generated revisions
   createdBy: 'user' | 'agent';
   createdAt: Date;
   updatedAt: Date;
@@ -54,6 +64,7 @@ export interface CreateRevisionInput {
   constraints?: string[];
   applyMode?: ApplyMode;
   linkedIssueId?: string;
+  issueContext?: IssueContext;  // Full issue context for auto-generated revisions
   createdBy?: 'user' | 'agent';
 }
 
