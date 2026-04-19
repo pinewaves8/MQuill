@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { chapterStore, draftSegmentStore } from '@/lib/db/projects-store';
+import { chapterStore, draftSegmentStore, versionStore } from '@/lib/db/projects-store';
 import { SaveDraftSchema } from '@/lib/validation/schemas';
 
 interface RouteParams {
@@ -120,6 +120,28 @@ export async function PUT(
     // Calculate total word count
     const segments = await draftSegmentStore.getByChapter(chapterId);
     const totalWordCount = segments.reduce((sum, s) => sum + s.content.length, 0);
+
+    // Create an initial baseline version the first time AI-generated draft content lands.
+    const existingVersions = await versionStore.getByChapter(chapterId);
+    const hasAiGeneratedContent = segments.some(
+      (segment) => segment.source === 'ai' && segment.content.trim().length > 0
+    );
+    if (existingVersions.length === 0 && hasAiGeneratedContent && totalWordCount >= 100) {
+      const snapshotContent = segments.map((segment) => segment.content).join('\n\n');
+      await versionStore.create({
+        projectId,
+        chapterId,
+        label: '初稿 v1',
+        type: 'baseline',
+        source: 'auto-draft',
+        summary: '自动生成正文初稿',
+        snapshotContent,
+        wordCount: totalWordCount,
+        isCurrent: true,
+        trigger: 'auto_draft',
+        stage: 'draft',
+      });
+    }
 
     // Update chapter word count and status
     await chapterStore.update(chapterId, {
