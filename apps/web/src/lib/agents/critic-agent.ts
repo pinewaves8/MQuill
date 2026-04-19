@@ -222,7 +222,7 @@ function buildCriticUserPrompt(input: EvaluateInput): string {
 
   prompt += `【章节正文】\n${input.content}\n\n`;
 
-  prompt += `请以 JSON 格式返回评估结果：\n`;
+  prompt += `请以 JSON 格式返回评估结果。重要：revision 各项必须包含具体的问题段落位置信息：\n`;
   prompt += `{
   "gate": {
     "text_completeness": { "status": "pass|warn|fail", "reason": "" },
@@ -246,13 +246,36 @@ function buildCriticUserPrompt(input: EvaluateInput): string {
   "strengths": ["亮点1", "亮点2", ...],
   "majorIssues": ["主要问题1", "主要问题2", ...],
   "revision": {
-    "must_fix": ["必须修改项1", "必须修改项2", ...],
-    "should_improve": ["建议修改项1", "建议修改项2", ...],
-    "optional_enhancements": ["可选增强1", "可选增强2", ...]
+    "must_fix": [
+      {
+        "text": "必须修改项描述",
+        "excerpt": "引用问题所在的具体段落原文（30-100字）",
+        "paragraphIndex": 段落序号(从0开始)
+      },
+      ...
+    ],
+    "should_improve": [
+      {
+        "text": "建议修改项描述",
+        "excerpt": "引用问题所在的具体段落原文",
+        "paragraphIndex": 段落序号
+      },
+      ...
+    ],
+    "optional_enhancements": [
+      {
+        "text": "可选增强描述",
+        "excerpt": "引用相关段落原文",
+        "paragraphIndex": 段落序号
+      },
+      ...
+    ]
   },
   "decision": "pass|pass_with_notes|partial_rewrite|full_rewrite|human_review|gate_fail"
 }
 `;
+
+  prompt += `\n【重要】每个 revision 项的 excerpt 必须精确引用正文中的原句/段落，作为问题位置的凭据。`;
 
   prompt += `\n请仔细阅读内容，提供客观公正的评估。输出必须严格遵循JSON格式，不要包含任何其他文字。`;
 

@@ -10,6 +10,7 @@ export interface IssueContext {
   suggestion?: string;   // AI suggested fix
   tags?: string[];      // Issue tags (e.g., 'ai_smell', 'low_tension')
   severity?: 'low' | 'medium' | 'high';
+  paragraphIndex?: number; // Paragraph index for location
 }
 
 export interface RevisionTask {

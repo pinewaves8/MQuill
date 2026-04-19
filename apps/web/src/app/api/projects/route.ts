@@ -8,18 +8,22 @@ export async function GET() {
   try {
     const projects = await projectStore.getAll();
 
-    // Attach tags to each project
-    const projectsWithTags = await Promise.all(
+    // Attach tags, wordCount, and chapterCount to each project
+    const projectsWithStats = await Promise.all(
       projects.map(async (project) => {
         const tags = await projectStore.getTags(project.id);
+        const chapters = await chapterStore.getByProject(project.id);
+        const wordCount = chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
         return {
           ...project,
           tags: tags.map((t) => t.tag),
+          wordCount,
+          chapterCount: chapters.length,
         };
       })
     );
 
-    return NextResponse.json({ data: { projects: projectsWithTags } });
+    return NextResponse.json({ data: { projects: projectsWithStats } });
   } catch (error) {
     console.error('Error fetching projects:', error);
     return NextResponse.json(

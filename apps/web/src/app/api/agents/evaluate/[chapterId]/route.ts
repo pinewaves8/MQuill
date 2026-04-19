@@ -22,7 +22,6 @@ export async function POST(
       );
     }
 
-    // Get draft content
     const segments = await draftSegmentStore.getByChapter(chapterId);
     const content = segments.map((s) => s.content).join('\n\n');
 
@@ -33,7 +32,6 @@ export async function POST(
       );
     }
 
-    // Run critic agent (v2 - 8-dimension evaluation)
     const evaluationResult = await criticAgent({
       projectId: chapter.projectId,
       chapterId,
@@ -41,30 +39,30 @@ export async function POST(
       content,
     });
 
-    // Determine overall issue type based on lowest scoring dimension
     const scores = evaluationResult.scores;
     const lowestDim = Object.entries(scores)
       .filter(([k]) => k !== 'total' && k !== 'ai_smell_severity')
       .sort(([, a], [, b]) => (a as number) - (b as number))[0];
-    const overallIssueType = lowestDim ? (lowestDim[0] as any) : 'style';
+    const overallIssueType = lowestDim ? (lowestDim[0] as 'style') : 'style';
 
-    // Build revision items from evaluation result
     const revisionItems = [
-      ...evaluationResult.revision.must_fix.map((text) => ({
-        text,
+      ...evaluationResult.revision.must_fix.map((item) => ({
+        text: typeof item === 'string' ? item : item.text,
+        excerpt: typeof item === 'string' ? undefined : item.excerpt,
+        paragraphIndex: typeof item === 'string' ? undefined : item.paragraphIndex,
         level: 'must_fix' as const,
       })),
-      ...evaluationResult.revision.should_improve.map((text) => ({
-        text,
+      ...evaluationResult.revision.should_improve.map((item) => ({
+        text: typeof item === 'string' ? item : item.text,
+        excerpt: typeof item === 'string' ? undefined : item.excerpt,
+        paragraphIndex: typeof item === 'string' ? undefined : item.paragraphIndex,
         level: 'should_improve' as const,
       })),
     ];
+    const sortedSegments = [...segments].sort((a, b) => a.segmentIndex - b.segmentIndex);
 
-    // Check for existing issues to avoid duplicates
     const existingIssues = await issueStore.getByChapter(chapterId);
     const existingSuggestions = new Set(existingIssues.map((i) => i.suggestion));
-
-    // Deduplicate: only keep revisionItems that don't already exist
     const newRevisionItems = revisionItems.filter((item) => !existingSuggestions.has(item.text));
 
     if (newRevisionItems.length === 0) {
@@ -87,24 +85,28 @@ export async function POST(
           chapterId,
           issueType: overallIssueType,
           severity: item.level === 'must_fix' ? 'high' : item.level === 'should_improve' ? 'medium' : 'low',
-          title: item.level === 'must_fix' ? `【必须修改】${item.text}` : `【建议优化】${item.text}`,
+          title: item.level === 'must_fix' ? `【必须修正】${item.text}` : `【建议优化】${item.text}`,
           reason: evaluationResult.majorIssues.join('；') || '根据评估结果建议修改',
+          locationRef: resolveIssueLocationRef(sortedSegments, item.excerpt, item.paragraphIndex),
           suggestion: item.text,
           status: 'open',
           tags: evaluationResult.issueTags,
           revisionLevel: item.level,
+          excerpt: item.excerpt,
+          paragraphIndex: item.paragraphIndex,
         })
       )
     );
 
-    // Auto-create revision tasks for must_fix items
     const mustFixIssues = createdIssues.filter((issue) => issue.revisionLevel === 'must_fix');
     const createdRevisions = await Promise.all(
       mustFixIssues.map((issue) =>
         revisionStore.create({
           projectId: chapter.projectId,
           chapterId,
-          targetScope: 'segment',
+          targetScope: issue.locationRef ? 'segment' : 'chapter',
+          targetRefId: issue.locationRef,
+          originalText: issue.excerpt,
           suggestion: issue.suggestion || issue.title,
           goals: evaluationResult.majorIssues,
           constraints: [],
@@ -116,6 +118,7 @@ export async function POST(
             suggestion: issue.suggestion,
             tags: issue.tags,
             severity: issue.severity,
+            paragraphIndex: issue.paragraphIndex,
           },
           createdBy: 'agent',
           status: 'draft',
@@ -139,4 +142,40 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+function resolveIssueLocationRef(
+  segments: Array<{ id: string; content: string }>,
+  excerpt?: string,
+  paragraphIndex?: number
+): string | undefined {
+  const normalizedExcerpt = excerpt?.trim();
+
+  if (normalizedExcerpt) {
+    const matchingSegment = segments.find((segment) => segment.content.includes(normalizedExcerpt));
+    if (matchingSegment) {
+      return matchingSegment.id;
+    }
+  }
+
+  if (paragraphIndex === undefined || paragraphIndex < 0) {
+    return undefined;
+  }
+
+  let paragraphCursor = 0;
+  for (const segment of segments) {
+    const paragraphCount = segment.content
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean).length;
+    const normalizedCount = Math.max(paragraphCount, 1);
+
+    if (paragraphIndex < paragraphCursor + normalizedCount) {
+      return segment.id;
+    }
+
+    paragraphCursor += normalizedCount;
+  }
+
+  return undefined;
 }

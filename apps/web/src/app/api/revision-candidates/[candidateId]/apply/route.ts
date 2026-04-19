@@ -45,7 +45,7 @@ export async function POST(
       const branchVersion = currentVersion
         ? await versionStore.createBranchFromVersion(currentVersion.id, {
             branchName: `修订分支-${Date.now()}`,
-            summary: `保留修订候选稿：${revision.suggestion}`,
+            summary: `保留修订候选：${revision.suggestion}`,
             snapshotContent: candidate.candidateText,
             wordCount: candidate.candidateText.length,
           })
@@ -55,8 +55,8 @@ export async function POST(
             label: `修订分支 ${Date.now().toString().slice(-4)}`,
             type: 'branch',
             source: `revision:${revision.id}`,
-            summary: `保留修订候选稿：${revision.suggestion}`,
-            branchName: '修订候选稿',
+            summary: `保留修订候选：${revision.suggestion}`,
+            branchName: '修订候选',
             snapshotContent: candidate.candidateText,
             wordCount: candidate.candidateText.length,
             isCurrent: false,
@@ -71,7 +71,7 @@ export async function POST(
 
       if (revision.linkedIssueId && branchVersion) {
         await issueStore.update(revision.linkedIssueId, {
-          status: 'in_revision',
+          status: 'fixed',
           linkedVersionId: branchVersion.id,
           linkedVersionLabel: branchVersion.label,
           linkedVersionSummary: branchVersion.summary,
@@ -91,7 +91,7 @@ export async function POST(
     const beforeVersion = await versionStore.create({
       projectId: revision.projectId,
       chapterId: revision.chapterId,
-      label: `修订前备份 ${Date.now().toString().slice(-4)}`,
+      label: `修订前备份${Date.now().toString().slice(-4)}`,
       type: 'revision',
       source: `revision:${revision.id}`,
       summary: `修订前快照：${revision.suggestion}`,
@@ -105,17 +105,24 @@ export async function POST(
       parentId: currentVersion?.id,
     });
 
-    if (mode === 'replace' || mode === 'append') {
-      let targetSegmentId = revision.targetRefId;
-
-      if (!targetSegmentId) {
-        const editableSegments = segments.filter((segment) => !segment.isLocked);
-        if (editableSegments.length > 0) {
-          targetSegmentId = editableSegments[0].id;
-        } else if (segments.length > 0) {
-          targetSegmentId = segments[0].id;
-        }
+    if (revision.targetScope === 'chapter' && mode === 'replace') {
+      for (const segment of segments) {
+        await draftSegmentStore.update(segment.id, {
+          content: '',
+          isLocked: false,
+        });
       }
+
+      await draftSegmentStore.upsert({
+        projectId: revision.projectId,
+        chapterId: revision.chapterId,
+        segmentIndex: 0,
+        content: candidate.candidateText,
+        source: 'ai',
+        isLocked: false,
+      });
+    } else if (mode === 'replace' || mode === 'append') {
+      const targetSegmentId = resolveTargetSegmentId(segments, revision.targetRefId, candidate.originalText);
 
       if (targetSegmentId) {
         const targetSegment = segments.find((segment) => segment.id === targetSegmentId);
@@ -182,7 +189,7 @@ export async function POST(
     const appliedVersion = await versionStore.create({
       projectId: revision.projectId,
       chapterId: revision.chapterId,
-      label: `修订后版本 ${Date.now().toString().slice(-4)}`,
+      label: `修订后版本${Date.now().toString().slice(-4)}`,
       type: 'revision',
       source: `revision:${revision.id}`,
       summary: `应用修订建议：${revision.suggestion}`,
@@ -223,4 +230,29 @@ export async function POST(
     console.error('Error applying candidate:', error);
     return NextResponse.json({ error: 'Failed to apply candidate' }, { status: 500 });
   }
+}
+
+function resolveTargetSegmentId(
+  segments: Array<{ id: string; content: string; isLocked: boolean }>,
+  targetRefId?: string,
+  originalText?: string
+): string | undefined {
+  if (targetRefId) {
+    return targetRefId;
+  }
+
+  const normalizedOriginalText = originalText?.trim();
+  if (normalizedOriginalText) {
+    const matchingSegment = segments.find((segment) => segment.content.includes(normalizedOriginalText));
+    if (matchingSegment) {
+      return matchingSegment.id;
+    }
+  }
+
+  const editableSegment = segments.find((segment) => !segment.isLocked);
+  if (editableSegment) {
+    return editableSegment.id;
+  }
+
+  return segments[0]?.id;
 }

@@ -136,7 +136,14 @@ export interface EvaluationIssue {
   aiSmellSeverity?: 'low' | 'medium' | 'high'; // AI味严重度
 }
 
-// Full evaluation result
+// Revision item with paragraph-level location
+export interface RevisionItem {
+  text: string;
+  level: RevisionLevel;
+  excerpt?: string;         // 问题所在原文段落
+  paragraphIndex?: number;   // 段落索引 (从0开始)
+  charRange?: { start: number; end: number }; // 字符位置范围
+}
 export interface EvaluationResult {
   chapterId: string;
   gate: GateResults;
@@ -145,9 +152,9 @@ export interface EvaluationResult {
   strengths: string[];                  // 亮点
   majorIssues: string[];                 // 主要问题
   revision: {
-    must_fix: string[];
-    should_improve: string[];
-    optional_enhancements: string[];
+    must_fix: RevisionItem[];      // 改为带位置的 RevisionItem
+    should_improve: RevisionItem[];
+    optional_enhancements: RevisionItem[];
   };
   decision: EvaluationDecision;
 }
