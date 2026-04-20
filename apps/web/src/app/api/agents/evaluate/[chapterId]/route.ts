@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-import { chapterStore, draftSegmentStore, issueStore, revisionStore } from '@/lib/db/projects-store';
+import { chapterStore, draftSegmentStore, issueStore, projectStore, revisionStore } from '@/lib/db/projects-store';
+import { loadCollection } from '@/lib/db/file-storage';
 import { criticAgent } from '@/lib/agents/critic-agent';
 import {
+  BookOutline,
   EvaluationDetailsData,
   EvaluationHistoryEntry,
   EvaluationScoreData,
@@ -31,6 +33,11 @@ export async function POST(
     }
 
     const segments = await draftSegmentStore.getByChapter(chapterId);
+    const project = await projectStore.getById(chapter.projectId);
+    const charter = await projectStore.getCharter(chapter.projectId);
+    const projectChapters = await chapterStore.getByProject(chapter.projectId);
+    const outline = loadCollection<BookOutline>('outlines').find((item) => item.projectId === chapter.projectId);
+    const chapterContext = buildChapterEvaluationContext(chapter, projectChapters, outline);
     // Normalize content: join segments with \n\n, then normalize single newlines within paragraphs
     // Single newlines within a paragraph should be treated as visual line breaks, not paragraph separators
     const rawContent = segments.map((s) => s.content).join('\n\n');
@@ -48,6 +55,11 @@ export async function POST(
       chapterId,
       chapterTitle: chapter.title,
       content,
+      chapterGoal: chapterContext.chapterGoal,
+      keyEvents: chapterContext.keyEvents,
+      mainCharacters: chapterContext.mainCharacters.length > 0 ? chapterContext.mainCharacters : undefined,
+      volumeGoal: chapterContext.volumeGoal || charter?.coreConflict || project?.description,
+      previousSummaries: chapterContext.previousSummaries,
     });
 
     const scores = evaluationResult.scores;
@@ -294,6 +306,98 @@ function normalizeParagraphContent(content: string): string {
   return normalizedParagraphs.filter((p) => p.length > 0).join('\n\n');
 }
 
+function buildChapterEvaluationContext(
+  chapter: NonNullable<Awaited<ReturnType<typeof chapterStore.getById>>>,
+  chapters: Awaited<ReturnType<typeof chapterStore.getByProject>>,
+  outline?: BookOutline
+): {
+  chapterGoal?: string;
+  keyEvents?: string[];
+  mainCharacters: string[];
+  volumeGoal?: string;
+  previousSummaries?: string[];
+} {
+  const sortedChapters = [...chapters].sort((a, b) => a.sortOrder - b.sortOrder);
+  const chapterIndex = sortedChapters.findIndex((item) => item.id === chapter.id);
+  const previousSummaries = sortedChapters
+    .slice(Math.max(0, chapterIndex - 3), chapterIndex)
+    .map((item) => item.summary?.trim())
+    .filter((item): item is string => Boolean(item));
+
+  const volume = outline?.volumes.find((item) => item.id === chapter.parentVolumeId);
+  const outlineChapter =
+    volume?.chapters.find((item) => item.title === chapter.title) ??
+    outline?.volumes
+      .flatMap((item) => item.chapters)
+      .find((item) => item.title === chapter.title);
+
+  const chapterGoal = outlineChapter?.chapterGoal || extractSummaryLine(chapter.summary, 0);
+  const keyEvents = collectKeyEvents(outlineChapter, chapter.summary);
+  const mainCharacters = collectMainCharacters(chapter.summary);
+
+  return {
+    chapterGoal,
+    keyEvents: keyEvents.length > 0 ? keyEvents : undefined,
+    mainCharacters,
+    volumeGoal: volume?.goal,
+    previousSummaries: previousSummaries.length > 0 ? previousSummaries : undefined,
+  };
+}
+
+function extractSummaryLine(summary: string | undefined, index: number): string | undefined {
+  if (!summary) {
+    return undefined;
+  }
+
+  return summary
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)[index];
+}
+
+function collectKeyEvents(
+  outlineChapter: BookOutline['volumes'][number]['chapters'][number] | undefined,
+  chapterSummary?: string
+): string[] {
+  const candidates = [
+    outlineChapter?.mainEvents,
+    outlineChapter?.hook,
+    extractSummaryLine(chapterSummary, 1),
+    extractSummaryLine(chapterSummary, 3),
+  ];
+
+  return candidates.filter((item): item is string => Boolean(item?.trim())).slice(0, 4);
+}
+
+function collectMainCharacters(chapterSummary?: string): string[] {
+  if (!chapterSummary) {
+    return [];
+  }
+
+  const uniqueNames = new Set<string>();
+  const matches = chapterSummary.match(/[\u4e00-\u9fa5]{2,4}/g) || [];
+
+  for (const token of matches) {
+    if (isLikelyCharacterName(token)) {
+      uniqueNames.add(token);
+    }
+    if (uniqueNames.size >= 6) {
+      break;
+    }
+  }
+
+  return Array.from(uniqueNames);
+}
+
+function isLikelyCharacterName(token: string): boolean {
+  const stopWords = ['章节目标', '主要事件', '人物成长', '结尾钩子', '本章目标', '分卷目标'];
+  if (stopWords.some((word) => token.includes(word))) {
+    return false;
+  }
+
+  return token.length >= 2 && token.length <= 4;
+}
+
 /**
  * Build EvaluationScoreData from 8-dimension scores for persistence
  */
@@ -308,29 +412,42 @@ function buildEvaluationScoreData(scores: {
   ending_hook: number;
   ai_smell_severity?: 'low' | 'medium' | 'high';
 }): EvaluationScoreData {
-  // Map 8 dimensions to 6 dimensions
-  const readability = Math.round((scores.language_and_style + scores.information_and_pacing) / 2);
-  const rhythm = Math.round((scores.information_and_pacing + scores.conflict_and_tension) / 2);
-  const characterConsistency = Math.round(scores.character_and_voice);
+  const chapterGoalCompletion = normalizeScore(scores.chapter_goal_completion, 15);
+  const plotProgressAndCausality = normalizeScore(scores.plot_progress_and_causality, 15);
+  const conflictAndTension = normalizeScore(scores.conflict_and_tension, 15);
+  const characterAndVoice = normalizeScore(scores.character_and_voice, 15);
+  const languageAndStyle = normalizeScore(scores.language_and_style, 10);
+  const informationAndPacing = normalizeScore(scores.information_and_pacing, 10);
+  const endingHook = normalizeScore(scores.ending_hook, 10);
+  const aiSmellRisk = mapAiSmellSeverityToRisk(scores.ai_smell_severity);
+  const aiNaturalness = 100 - aiSmellRisk;
+
+  const readability = Math.round((languageAndStyle + informationAndPacing) / 2);
+  const rhythm = Math.round((informationAndPacing + conflictAndTension) / 2);
+  const characterConsistency = characterAndVoice;
   const plotCompleteness = Math.round(
-    (scores.chapter_goal_completion + scores.plot_progress_and_causality + scores.ending_hook) / 3
+    (chapterGoalCompletion + plotProgressAndCausality + endingHook) / 3
   );
 
-  // AI smell: convert severity to score (higher = more AI smell)
-  const aiSmellScore = scores.ai_smell_severity === 'low' ? 12 :
-                       scores.ai_smell_severity === 'medium' ? 28 : 55;
+  // foreshadowRecovery 仍是占位值，未接入真实检测前不参与整体加权，避免无差别压低所有章节
+  const totalWeight =
+    SCORE_CARD_WEIGHTS.plotCompleteness +
+    SCORE_CARD_WEIGHTS.characterConsistency +
+    SCORE_CARD_WEIGHTS.rhythm +
+    SCORE_CARD_WEIGHTS.readability +
+    SCORE_CARD_WEIGHTS.aiSmell;
 
-  // Calculate overall weighted score
   const overall = Math.round(
-    plotCompleteness * SCORE_CARD_WEIGHTS.plotCompleteness +
-    characterConsistency * SCORE_CARD_WEIGHTS.characterConsistency +
-    rhythm * SCORE_CARD_WEIGHTS.rhythm +
-    readability * SCORE_CARD_WEIGHTS.readability +
-    aiSmellScore * SCORE_CARD_WEIGHTS.aiSmell
+    (
+      plotCompleteness * SCORE_CARD_WEIGHTS.plotCompleteness +
+      characterConsistency * SCORE_CARD_WEIGHTS.characterConsistency +
+      rhythm * SCORE_CARD_WEIGHTS.rhythm +
+      readability * SCORE_CARD_WEIGHTS.readability +
+      aiNaturalness * SCORE_CARD_WEIGHTS.aiSmell
+    ) / totalWeight
   );
 
-  // Calculate percentile (mock - in real implementation would compare to historical data)
-  const percentile = Math.max(0, Math.min(99, Math.round(overall * 0.8 + Math.random() * 20)));
+  const percentile = 0;
 
   return {
     overall,
@@ -342,10 +459,24 @@ function buildEvaluationScoreData(scores: {
       characterConsistency,
       plotCompleteness,
       foreshadowRecovery: 0, // Will be updated by foreshadowing checker if available
-      aiSmell: aiSmellScore,
+      aiSmell: aiSmellRisk,
     },
     evaluatedAt: new Date().toISOString(),
   };
+}
+
+function normalizeScore(value: number, maxScore: number): number {
+  if (!Number.isFinite(value) || maxScore <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round((value / maxScore) * 100)));
+}
+
+function mapAiSmellSeverityToRisk(severity?: 'low' | 'medium' | 'high'): number {
+  if (severity === 'low') return 12;
+  if (severity === 'high') return 55;
+  return 28;
 }
 
 function buildEvaluationSummaryData(result: {
