@@ -186,6 +186,68 @@ export interface EvaluationMetrics {
   consistency: number;      // 人物一致性 (from character + continuity)
 }
 
+// ============================================================
+// New Score Card - 6 Dimension Simplified View
+// ============================================================
+
+export interface ScoreCardDimension {
+  name: string;
+  label: string;
+  score: number;           // 0-100
+  maxScore: number;        // usually 100
+  weight: number;          // weight for overall calculation (sum to 1)
+  color: 'green' | 'yellow' | 'red';
+  description: string;
+}
+
+export interface EvaluationScoreCard {
+  overall: number;         // weighted average, 0-100
+  overallGrade: 'excellent' | 'good' | 'fair' | 'poor';
+  percentile: number;      // beats X% of chapters
+  dimensions: {
+    readability: ScoreCardDimension;
+    rhythm: ScoreCardDimension;
+    characterConsistency: ScoreCardDimension;
+    plotCompleteness: ScoreCardDimension;
+    foreshadowRecovery: ScoreCardDimension;
+    aiSmell: ScoreCardDimension;  // lower is better, shows as "模板化程度"
+  };
+}
+
+// Weights for overall score calculation
+export const SCORE_CARD_WEIGHTS = {
+  readability: 0.10,           // 10%
+  rhythm: 0.15,                // 15%
+  characterConsistency: 0.25,  // 25%
+  plotCompleteness: 0.30,     // 30% - most important
+  foreshadowRecovery: 0.10,   // 10%
+  aiSmell: 0.10,              // 10%
+} as const;
+
+// Grade thresholds
+export function getOverallGrade(score: number): 'excellent' | 'good' | 'fair' | 'poor' {
+  if (score >= 85) return 'excellent';
+  if (score >= 70) return 'good';
+  if (score >= 55) return 'fair';
+  return 'poor';
+}
+
+export function getScoreColor(score: number): 'green' | 'yellow' | 'red' {
+  if (score >= 80) return 'green';
+  if (score >= 60) return 'yellow';
+  return 'red';
+}
+
+export function getGradeLabel(grade: EvaluationScoreCard['overallGrade']): string {
+  const labels = {
+    excellent: '优秀',
+    good: '良好',
+    fair: '一般',
+    poor: '较差',
+  };
+  return labels[grade];
+}
+
 // Status metadata for UI
 export const ISSUE_STATUS_META: Record<IssueStatus, { label: string; classes: string }> = {
   open: { label: '待处理', classes: 'bg-blue-50 text-blue-600 border-blue-200' },

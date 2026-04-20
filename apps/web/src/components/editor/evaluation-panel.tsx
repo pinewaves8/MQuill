@@ -4,13 +4,16 @@ import { useState, useEffect } from 'react';
 import {
   EvaluationIssue,
   IssueStatus,
-  EvaluationMetrics,
   IssueTag,
   TAG_CATEGORY_META,
   SEVERITY_META,
   ISSUE_STATUS_META,
+  EvaluationScoreCard as ScoreCardType,
+  EvaluationDetailsData,
+  EvaluationSummaryData,
 } from '@packages/shared-types';
 import { useRevisionStore } from '@/lib/state/revision-store';
+import { EvaluationScoreCard, buildScoreCard } from './evaluation-score-card';
 
 interface EvaluationPanelProps {
   chapterId: string;
@@ -62,14 +65,19 @@ export function EvaluationPanel({ chapterId, projectId, chapterTitle, isOpen, on
   const [openOnly, setOpenOnly] = useState(false);
   const [sortMode, setSortMode] = useState<string>('priority');
   const [traceExpanded, setTraceExpanded] = useState(false);
-  const [metrics, setMetrics] = useState<EvaluationMetrics | null>(null);
+  const [scoreCards, setScoreCards] = useState<Record<string, ScoreCardType>>({});
   const { openModal, setSelectedText } = useRevisionStore();
 
   useEffect(() => {
     if (isOpen && chapterId) {
+      setEvaluationResult(null);
       fetchIssues();
+      fetchChapterScores();
     }
   }, [isOpen, chapterId]);
+
+  // Get current chapter's score card
+  const scoreCard = chapterId ? scoreCards[chapterId] : null;
 
   const fetchIssues = async () => {
     setIsLoading(true);
@@ -86,6 +94,93 @@ export function EvaluationPanel({ chapterId, projectId, chapterTitle, isOpen, on
     }
   };
 
+  const fetchChapterScores = async () => {
+    if (!chapterId) return;
+    try {
+      const res = await fetch(`/api/chapters/${chapterId}`);
+      if (res.ok) {
+        const payload = await res.json();
+        const chapter = payload.data?.chapter;
+        if (chapter?.evaluationDetails) {
+          setEvaluationResult(hydrateEvaluationDetails(chapter.evaluationDetails as EvaluationDetailsData));
+        } else if (chapter?.evaluationSummary) {
+          setEvaluationResult(hydrateEvaluationResult(chapter.evaluationSummary as EvaluationSummaryData, chapter.evaluationScores));
+        } else {
+          setEvaluationResult(null);
+        }
+        if (chapter?.evaluationScores) {
+          // Convert stored data to ScoreCardType
+          const stored = chapter.evaluationScores;
+          const card: ScoreCardType = {
+            overall: stored.overall,
+            overallGrade: stored.overallGrade,
+            percentile: stored.percentile,
+            dimensions: {
+              readability: {
+                name: 'readability',
+                label: '可读性',
+                score: stored.dimensions.readability,
+                maxScore: 100,
+                weight: 0.1,
+                color: stored.dimensions.readability >= 80 ? 'green' : stored.dimensions.readability >= 60 ? 'yellow' : 'red',
+                description: '句子结构、表达清晰度',
+              },
+              rhythm: {
+                name: 'rhythm',
+                label: '节奏健康',
+                score: stored.dimensions.rhythm,
+                maxScore: 100,
+                weight: 0.15,
+                color: stored.dimensions.rhythm >= 80 ? 'green' : stored.dimensions.rhythm >= 60 ? 'yellow' : 'red',
+                description: '段落长短交替、冲突密度',
+              },
+              characterConsistency: {
+                name: 'characterConsistency',
+                label: '人物一致',
+                score: stored.dimensions.characterConsistency,
+                maxScore: 100,
+                weight: 0.25,
+                color: stored.dimensions.characterConsistency >= 80 ? 'green' : stored.dimensions.characterConsistency >= 60 ? 'yellow' : 'red',
+                description: '对话风格、行为逻辑一致',
+              },
+              plotCompleteness: {
+                name: 'plotCompleteness',
+                label: '剧情完整',
+                score: stored.dimensions.plotCompleteness,
+                maxScore: 100,
+                weight: 0.3,
+                color: stored.dimensions.plotCompleteness >= 80 ? 'green' : stored.dimensions.plotCompleteness >= 60 ? 'yellow' : 'red',
+                description: '章节目标完成度、伏笔埋入',
+              },
+              foreshadowRecovery: {
+                name: 'foreshadowRecovery',
+                label: '伏笔回收',
+                score: stored.dimensions.foreshadowRecovery || 0,
+                maxScore: 100,
+                weight: 0.1,
+                color: stored.dimensions.foreshadowRecovery >= 80 ? 'green' : stored.dimensions.foreshadowRecovery >= 60 ? 'yellow' : 'red',
+                description: '已回收伏笔/总伏笔比例',
+              },
+              aiSmell: {
+                name: 'aiSmell',
+                label: '模板化',
+                score: stored.dimensions.aiSmell,
+                maxScore: 100,
+                weight: 0.1,
+                color: stored.dimensions.aiSmell <= 15 ? 'green' : stored.dimensions.aiSmell <= 35 ? 'yellow' : 'red',
+                description: 'AI模板化句式浓度（越低越好）',
+              },
+            },
+          };
+          // Store with chapterId key to avoid overwriting other chapters
+          setScoreCards((prev) => ({ ...prev, [chapterId]: card }));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch chapter scores:', error);
+    }
+  };
+
   const handleRunEvaluation = async () => {
     setIsEvaluating(true);
     try {
@@ -99,16 +194,25 @@ export function EvaluationPanel({ chapterId, projectId, chapterTitle, isOpen, on
         // Try to parse evaluation result if returned
         if (data.evaluationResult) {
           setEvaluationResult(data.evaluationResult);
+          // Build score card from evaluation result and store with chapterId key
+          const scores = data.evaluationResult.scores;
+          const card = buildScoreCard(scores);
+          setScoreCards((prev) => ({ ...prev, [chapterId]: card }));
         } else if (data.scoreSummary) {
           // Legacy fallback
           const scoreSummary = data.scoreSummary;
-          setMetrics({
-            readability: scoreSummary.clarity || 70,
-            rhythm: scoreSummary.pacing || 70,
-            consistency: Math.round(
-              ((scoreSummary.character || 70) + (scoreSummary.lore || 70) + (scoreSummary.timeline || 70)) / 3
-            ),
+          const card = buildScoreCard({
+            chapter_goal_completion: scoreSummary.chapter_goal_completion || 70,
+            plot_progress_and_causality: scoreSummary.plot_progress_and_causality || 70,
+            conflict_and_tension: scoreSummary.conflict_and_tension || 70,
+            character_and_voice: scoreSummary.character_and_voice || 70,
+            language_and_style: scoreSummary.language_and_style || 70,
+            continuity_and_consistency: scoreSummary.continuity_and_consistency || 70,
+            information_and_pacing: scoreSummary.information_and_pacing || 70,
+            ending_hook: scoreSummary.ending_hook || 70,
+            ai_smell_severity: scoreSummary.ai_smell_severity,
           });
+          setScoreCards((prev) => ({ ...prev, [chapterId]: card }));
         }
 
         setIssues(data.issues || []);
@@ -347,65 +451,10 @@ export function EvaluationPanel({ chapterId, projectId, chapterTitle, isOpen, on
           </div>
         )}
 
-        {/* Metrics */}
-        {evaluationResult && (
+        {/* Score Card */}
+        {scoreCard && (
           <div className="px-6 py-4 border-b border-gray-100">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
-                <div className="text-2xl font-bold text-blue-900">
-                  {evaluationResult.scores.total}
-                </div>
-                <div className="text-xs text-blue-700 mb-2">综合评分</div>
-                <div className="w-full bg-blue-200 rounded-full h-1.5">
-                  <div
-                    className="bg-blue-600 h-1.5 rounded-full transition-all"
-                    style={{ width: `${evaluationResult.scores.total}%` }}
-                  />
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
-                <div className="text-2xl font-bold text-purple-900">
-                  {evaluationResult.scores.conflict_and_tension +
-                    evaluationResult.scores.plot_progress_and_causality +
-                    evaluationResult.scores.chapter_goal_completion}
-                </div>
-                <div className="text-xs text-purple-700 mb-2">剧情质量 (满分45)</div>
-                <div className="w-full bg-purple-200 rounded-full h-1.5">
-                  <div
-                    className="bg-purple-600 h-1.5 rounded-full transition-all"
-                    style={{
-                      width: `${
-                        ((evaluationResult.scores.conflict_and_tension +
-                          evaluationResult.scores.plot_progress_and_causality +
-                          evaluationResult.scores.chapter_goal_completion) /
-                          45) *
-                        100
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4 border border-emerald-200">
-                <div className="text-2xl font-bold text-emerald-900">
-                  {evaluationResult.scores.character_and_voice +
-                    evaluationResult.scores.language_and_style}
-                </div>
-                <div className="text-xs text-emerald-700 mb-2">人物语言 (满分25)</div>
-                <div className="w-full bg-emerald-200 rounded-full h-1.5">
-                  <div
-                    className="bg-emerald-600 h-1.5 rounded-full transition-all"
-                    style={{
-                      width: `${
-                        ((evaluationResult.scores.character_and_voice +
-                          evaluationResult.scores.language_and_style) /
-                          25) *
-                        100
-                      }%`,
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+            <EvaluationScoreCard scoreCard={scoreCard} />
           </div>
         )}
 
@@ -664,4 +713,51 @@ export function EvaluationPanel({ chapterId, projectId, chapterTitle, isOpen, on
       </div>
     </div>
   );
+}
+
+function hydrateEvaluationResult(
+  summary: EvaluationSummaryData,
+  storedScores?: {
+    overall?: number;
+  }
+): EvaluationResult {
+  return {
+    gate: summary.gate,
+    scores: {
+      chapter_goal_completion: 0,
+      plot_progress_and_causality: 0,
+      conflict_and_tension: 0,
+      character_and_voice: 0,
+      language_and_style: 0,
+      continuity_and_consistency: 0,
+      information_and_pacing: 0,
+      ending_hook: 0,
+      total: storedScores?.overall ?? 0,
+    },
+    issueTags: summary.issueTags as IssueTag[],
+    strengths: summary.strengths,
+    majorIssues: summary.majorIssues,
+    revision: {
+      must_fix: [],
+      should_improve: [],
+      optional_enhancements: [],
+    },
+    decision: summary.decision,
+  };
+}
+
+function hydrateEvaluationDetails(details: EvaluationDetailsData): EvaluationResult {
+  return {
+    gate: details.gate,
+    scores: details.scores,
+    issueTags: details.issueTags as IssueTag[],
+    strengths: details.strengths,
+    majorIssues: details.majorIssues,
+    revision: {
+      must_fix: details.revision.must_fix.map((item) => item.text),
+      should_improve: details.revision.should_improve.map((item) => item.text),
+      optional_enhancements: details.revision.optional_enhancements.map((item) => item.text),
+    },
+    decision: details.decision,
+  };
 }
