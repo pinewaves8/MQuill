@@ -1,0 +1,27 @@
+{
+  "runId": "2026-04-19T11-01-46-273Z",
+  "apiBase": "http://localhost:3001/api",
+  "startedAt": "2026-04-19T11:01:46.273Z",
+  "importedChapterTitles": [],
+  "chapterReports": [],
+  "totalScenes": 0,
+  "totalDraftSegments": 0,
+  "totalWords": 0,
+  "totalIssues": 0,
+  "totalRevisedIssues": 0,
+  "failureCategories": {
+    "other": 1
+  },
+  "exportGateIssues": [],
+  "notes": [],
+  "failures": [
+    "HTTP 500: Failed to bootstrap project"
+  ],
+  "project": {
+    "id": "9fc084b8-a169-402e-b8b4-1a599c5e4317",
+    "title": "燕山雪夜录"
+  },
+  "finishedAt": "2026-04-19T11:01:59.267Z",
+  "elapsedMs": 12994,
+  "outputReportPath": "C:\\tao\\MQuill\\docs\\test-runs\\2026-04-19T11-01-46-273Z-wuxia-baseline-report.json"
+}

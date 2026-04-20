@@ -1,0 +1,105 @@
+{
+  "runId": "2026-04-19T10-54-48-146Z",
+  "apiBase": "http://localhost:3001/api",
+  "startedAt": "2026-04-19T10:54:48.146Z",
+  "importedChapterTitles": [
+    "第一章：雪夜归人",
+    "第二章：故人来信"
+  ],
+  "chapterReports": [
+    {
+      "chapterId": "ef20e0c7-c0e5-48d2-bcb2-fee8ebaef5bd",
+      "chapterTitle": "第一章：雪夜归人",
+      "sceneCount": 3,
+      "draftSegments": 3,
+      "draftWordCount": 1820,
+      "snapshotLabel": "武侠基线初始版本-第一章：雪夜归人",
+      "evaluationScore": 88,
+      "issueCount": 4,
+      "revisedIssues": [
+        "d7c7405b-4bb4-4f9c-bd23-0ac42c940c9d",
+        "b8f41bea-a6c4-4d4f-9968-6c2263025f96"
+      ],
+      "failedIssues": [
+        {
+          "issueId": "cd68472f-06d5-45ec-8dc7-5e4436f2b0bf",
+          "reason": "HTTP 500: Revision output expanded too much (22/15, ratio 1.47 > 1.35)"
+        },
+        {
+          "issueId": "c2b1e7ad-20a9-4793-8402-fce58b59f1f7",
+          "reason": "HTTP 500: Revision output expanded too much (19/12, ratio 1.58 > 1.35)"
+        }
+      ]
+    },
+    {
+      "chapterId": "ae31bb9d-8dbe-4385-a232-15b5bfea992a",
+      "chapterTitle": "第二章：故人来信",
+      "sceneCount": 3,
+      "draftSegments": 3,
+      "draftWordCount": 1829,
+      "snapshotLabel": "武侠基线初始版本-第二章：故人来信",
+      "evaluationScore": 86,
+      "issueCount": 5,
+      "revisedIssues": [
+        "f283e68b-368b-47b9-a1be-276e2078acfc",
+        "805a98ff-1a0d-4668-b509-c764659ba88c",
+        "67221b3c-d1ba-4713-ac88-d2e2699611b2"
+      ],
+      "failedIssues": [
+        {
+          "issueId": "2dc58dea-7a36-4a64-8115-31eeedf1784f",
+          "reason": "HTTP 500: Revision output expanded too much (62/42, ratio 1.48 > 1.35)"
+        },
+        {
+          "issueId": "26af7d45-38d2-425a-873e-479cf9532116",
+          "reason": "HTTP 500: Revision output shrank too much (11/15, ratio 0.73 < 0.85)"
+        }
+      ]
+    }
+  ],
+  "totalScenes": 6,
+  "totalDraftSegments": 6,
+  "totalWords": 3649,
+  "totalIssues": 9,
+  "totalRevisedIssues": 5,
+  "notes": [
+    "Deleted 1 default chapter(s) before import to keep the baseline fixed at two chapters."
+  ],
+  "failures": [
+    "Chapter \"第一章：雪夜归人\" issue \"【必须修正】人物对话缺乏张力，未能体现角色性格\" failed: HTTP 500: Revision output expanded too much (22/15, ratio 1.47 > 1.35)",
+    "Chapter \"第一章：雪夜归人\" issue \"【建议优化】强化冲突，增加外部压力或阻碍\" failed: HTTP 500: Revision output expanded too much (19/12, ratio 1.58 > 1.35)",
+    "Chapter \"第二章：故人来信\" issue \"【必须修正】部分段落使用了总结性语言，应改为更具体的场景描写\" failed: HTTP 500: Revision output expanded too much (62/42, ratio 1.48 > 1.35)",
+    "Chapter \"第二章：故人来信\" issue \"【建议优化】增强语言表现力，避免过度抽象的情绪描述\" failed: HTTP 500: Revision output shrank too much (11/15, ratio 0.73 < 0.85)",
+    "HTTP 400: {\"error\":\"Export quality gate failed\",\"data\":{\"issues\":[{\"type\":\"length\",\"message\":\"Export blocked: total length 2581 is below minimum 4800.\"}]}}"
+  ],
+  "project": {
+    "id": "48d888dd-d2da-47b8-9f29-0d4d8687d9a1",
+    "title": "燕山雪夜录"
+  },
+  "charter": {
+    "theme": "在江湖恩怨与个人情义之间，探讨忠诚、背叛与救赎的复杂人性。",
+    "coreConflict": "一位昔日的侠客因旧案被卷入一场复仇风暴，面对曾经的师门与仇人之间的纠葛，必须在正义与情感之间做出抉择。",
+    "targetAudience": "喜欢传统武侠、注重文学质感的中青年读者，尤其是对江湖恩怨、人物心理和情节张力有较高期待的群体。",
+    "viewpoint": "第三人称有限视角，聚焦主角内心变化与外部冲突的交织。",
+    "styleKeywords": [
+      "武侠",
+      "短篇",
+      "江湖恩怨",
+      "冷峻",
+      "写意"
+    ],
+    "forbiddenRules": [
+      "避免过度依赖俗套桥段（如‘绝世武功’或‘神龙摆尾’）",
+      "避免角色过于脸谱化，需体现多维度性格",
+      "避免情节过于拖沓或逻辑漏洞"
+    ],
+    "writingGoals": [
+      "塑造鲜明而复杂的主角形象",
+      "通过两章完成完整起承转合，保持节奏紧凑",
+      "结尾留有余韵，引发读者回味"
+    ]
+  },
+  "finishedAt": "2026-04-19T10:56:26.699Z",
+  "elapsedMs": 98553,
+  "outputReportPath": "C:\\tao\\MQuill\\docs\\test-runs\\2026-04-19T10-54-48-146Z-wuxia-baseline-report.json"
+}

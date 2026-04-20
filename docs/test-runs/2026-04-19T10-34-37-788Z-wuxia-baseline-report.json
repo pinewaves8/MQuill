@@ -1,0 +1,86 @@
+{
+  "runId": "2026-04-19T10-34-37-788Z",
+  "apiBase": "http://localhost:3001/api",
+  "startedAt": "2026-04-19T10:34:37.788Z",
+  "importedChapterTitles": [
+    "第一章：雪夜惊变",
+    "第二章：旧地重游"
+  ],
+  "chapterReports": [
+    {
+      "chapterId": "95b0d1ee-be78-49cb-a333-11ddfd818a27",
+      "chapterTitle": "第一章：雪夜惊变",
+      "sceneCount": 3,
+      "draftSegments": 3,
+      "draftWordCount": 1823,
+      "snapshotLabel": "武侠基线初始版本-第一章：雪夜惊变",
+      "evaluationScore": 83,
+      "issueCount": 4,
+      "revisedIssues": [
+        "a2dbc52a-287c-4015-a9c9-e61ef0b52380",
+        "dfcfbf0c-d3a8-4f05-961a-68da77d2f456",
+        "8a731499-8ff8-4f09-a247-21c8872804ba",
+        "805b3d46-1cf6-4a44-8914-836f53977fb3"
+      ],
+      "failedIssues": []
+    },
+    {
+      "chapterId": "09ff53b0-e645-4096-b1dc-05e14bdf542b",
+      "chapterTitle": "第二章：旧地重游",
+      "sceneCount": 3,
+      "draftSegments": 3,
+      "draftWordCount": 1760,
+      "snapshotLabel": "武侠基线初始版本-第二章：旧地重游",
+      "evaluationScore": 86,
+      "issueCount": 4,
+      "revisedIssues": [
+        "47fdbe4f-7f4f-4a45-9fc1-13730ab63ee7",
+        "e2dc1f94-ac49-4fb6-b329-fa63537021c0",
+        "414995ed-12dd-4006-a14c-5fbb5228aac7",
+        "184ced82-d731-4c47-944a-802c8969287b"
+      ],
+      "failedIssues": []
+    }
+  ],
+  "totalScenes": 6,
+  "totalDraftSegments": 6,
+  "totalWords": 3353,
+  "totalIssues": 8,
+  "totalRevisedIssues": 8,
+  "notes": [
+    "Deleted 1 default chapter(s) before import to keep the baseline fixed at two chapters.",
+    "Final length 3353 is below the expected baseline floor 4800."
+  ],
+  "failures": [],
+  "project": {
+    "id": "126e1ec6-c9b5-4eb1-8665-1379f9817900",
+    "title": "燕山雪夜录"
+  },
+  "charter": {
+    "theme": "在江湖恩怨与个人情义之间，探讨忠诚、背叛与救赎的复杂人性。",
+    "coreConflict": "一位被误解的侠客在追查旧案真相的过程中，面对昔日同门的威胁与内心良知的挣扎，最终做出影响整个江湖命运的抉择。",
+    "targetAudience": "喜欢传统武侠风格、追求文学质感的中青年读者，尤其适合对人物情感与情节张力有较高要求的群体。",
+    "viewpoint": "第三人称有限视角，以主角的视角展开叙述，增强代入感与情感共鸣。",
+    "styleKeywords": [
+      "武侠",
+      "短篇",
+      "江湖恩怨",
+      "冷峻",
+      "写意"
+    ],
+    "forbiddenRules": [
+      "避免过度依赖打斗场面，应注重人物心理与情节发展",
+      "避免使用过于现代或非传统语言风格",
+      "避免设定过于复杂或脱离武侠背景的元素"
+    ],
+    "writingGoals": [
+      "通过两章内容完整呈现一个充满张力的江湖故事",
+      "塑造鲜明且具有深度的人物形象",
+      "结尾留有余韵，引发读者思考"
+    ]
+  },
+  "outputMarkdownPath": "C:\\tao\\MQuill\\docs\\test-runs\\2026-04-19T10-34-37-788Z-wuxia-baseline.md",
+  "finishedAt": "2026-04-19T10:36:25.823Z",
+  "elapsedMs": 108035,
+  "outputReportPath": "C:\\tao\\MQuill\\docs\\test-runs\\2026-04-19T10-34-37-788Z-wuxia-baseline-report.json"
+}

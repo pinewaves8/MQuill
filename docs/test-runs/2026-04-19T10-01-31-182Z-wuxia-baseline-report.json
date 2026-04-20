@@ -1,0 +1,85 @@
+{
+  "runId": "2026-04-19T10-01-31-182Z",
+  "apiBase": "http://localhost:3001/api",
+  "startedAt": "2026-04-19T10:01:31.182Z",
+  "importedChapterTitles": [
+    "第一章：雪夜归人",
+    "第二章：旧人旧事"
+  ],
+  "chapterReports": [
+    {
+      "chapterId": "ed66ba0c-1ffe-427d-a968-a74cec12e7d3",
+      "chapterTitle": "第一章：雪夜归人",
+      "sceneCount": 3,
+      "draftSegments": 3,
+      "draftWordCount": 1771,
+      "snapshotLabel": "武侠基线初始版本-第一章：雪夜归人",
+      "evaluationScore": 87,
+      "issueCount": 4,
+      "revisedIssues": [
+        "ce222e01-4c08-4a33-9e0d-71a5c7786a83",
+        "f42d1bb5-e6c2-465a-98ba-23d17de2c92b",
+        "039a8486-34df-4553-83ac-c4787366ae21",
+        "14d5243e-3f0b-40fa-8836-2f0860240561"
+      ],
+      "failedIssues": []
+    },
+    {
+      "chapterId": "ff62aa88-34a7-499c-9e9d-db936f90e167",
+      "chapterTitle": "第二章：旧人旧事",
+      "sceneCount": 3,
+      "draftSegments": 3,
+      "draftWordCount": 1703,
+      "snapshotLabel": "武侠基线初始版本-第二章：旧人旧事",
+      "evaluationScore": 86,
+      "issueCount": 4,
+      "revisedIssues": [
+        "4e2ff91d-3c95-4262-bc4e-4a38de0dbc42",
+        "a263621f-a633-43df-99f1-47301804a671",
+        "0e121040-3d37-4dc9-9e91-ff0060248c36",
+        "6f694f75-0603-466f-90f9-6b20852df226"
+      ],
+      "failedIssues": []
+    }
+  ],
+  "totalScenes": 6,
+  "totalDraftSegments": 6,
+  "totalWords": 5865,
+  "totalIssues": 8,
+  "totalRevisedIssues": 8,
+  "notes": [
+    "Deleted 1 default chapter(s) before import to keep the baseline fixed at two chapters."
+  ],
+  "failures": [],
+  "project": {
+    "id": "5de74f40-15e2-4c29-954b-957855e3f677",
+    "title": "燕山雪夜录"
+  },
+  "charter": {
+    "theme": "在江湖恩怨与个人情义之间，探讨忠诚、背叛与救赎的复杂人性。",
+    "coreConflict": "一位被误解的侠客在追查旧案真相的过程中，面对昔日同门的威胁与内心良知的挣扎，最终做出影响整个江湖命运的抉择。",
+    "targetAudience": "喜欢传统武侠风格、追求文学质感的中青年读者，尤其适合对江湖恩怨与人物心理描写感兴趣的群体。",
+    "viewpoint": "第三人称有限视角，聚焦主角内心变化与行动轨迹。",
+    "styleKeywords": [
+      "武侠",
+      "短篇",
+      "江湖恩怨",
+      "冷峻",
+      "写意"
+    ],
+    "forbiddenRules": [
+      "避免过度依赖打斗场面而忽略人物塑造",
+      "避免情节过于俗套或逻辑漏洞",
+      "避免使用现代语言或文化元素"
+    ],
+    "writingGoals": [
+      "塑造鲜明且有层次的人物形象",
+      "构建紧凑且富有张力的情节结构",
+      "在结尾留下余韵，引发读者思考"
+    ]
+  },
+  "outputMarkdownPath": "C:\\tao\\MQuill\\docs\\test-runs\\2026-04-19T10-01-31-182Z-wuxia-baseline.md",
+  "finishedAt": "2026-04-19T10:04:19.824Z",
+  "elapsedMs": 168642,
+  "outputReportPath": "C:\\tao\\MQuill\\docs\\test-runs\\2026-04-19T10-01-31-182Z-wuxia-baseline-report.json"
+}
