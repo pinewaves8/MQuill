@@ -61,21 +61,7 @@ export default function DashboardPage() {
   const handleProjectCreated = (project: Project) => {
     setProjects((prev) => [project, ...prev]);
     setIsModalOpen(false);
-
-    // If auto mode, call bootstrap API to generate charter
-    if (project.mode === 'auto') {
-      fetch(`/api/agents/bootstrap/${project.id}`, { method: 'POST' })
-        .then((res) => {
-          if (!res.ok) {
-            console.error('Failed to bootstrap project');
-          }
-        })
-        .finally(() => {
-          router.push(`/projects/${project.id}/editor?tab=outline`);
-        });
-    } else {
-      router.push(`/projects/${project.id}/editor?tab=outline`);
-    }
+    router.push(`/projects/${project.id}/editor?tab=outline`);
   };
 
   const handleProjectDeleted = (projectId: string) => {

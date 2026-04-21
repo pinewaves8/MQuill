@@ -2,9 +2,13 @@
  * Reference Library Store - Storage and retrieval for reference examples
  *
  * Three-tier reference library system:
- * - narrative-framework: 大纲、梗概结构
- * - visual-lens: 场景、细节、画面
- * - writing-technique: 笔法、技法
+ * - narrative-framework: 大纲、梗概、叙事结构（史诗、成长小说、循环时间等）
+ * - visual-lens: 场景、细节、画面感、感官描写（意境、氛围、动作描写等）
+ * - writing-technique: 笔法、技法、风格（冰山理论、意识流、草蛇灰线等）
+ *
+ * 共收录:
+ * - 中国技法 50+ 条（金圣叹、脂砚斋、金庸、古龙、鲁迅等）
+ * - 西方技法 60+ 条（亚里士多德、莎士比亚、乔伊斯、福克纳、马尔克斯等）
  *
  * Supports semantic and keyword retrieval modes.
  */
@@ -19,13 +23,9 @@ interface ReferenceLibrary {
   library_id: ReferenceLibraryType;
   examples: ReferenceExample[];
   tags: Set<string>;
-  workIndex: Map<string, ReferenceExample[]>; // by source_work
-  tagIndex: Map<string, ReferenceExample[]>; // by technique_tags
+  workIndex: Map<string, ReferenceExample[]>;
+  tagIndex: Map<string, ReferenceExample[]>;
 }
-
-// ============================================================
-// In-Memory Store
-// ============================================================
 
 const libraries: Record<ReferenceLibraryType, ReferenceLibrary> = {
   'narrative-framework': {
@@ -61,22 +61,13 @@ export function registerReferenceExample(example: ReferenceExample): void {
     console.error(`Unknown reference library category: ${example.category}`);
     return;
   }
-
-  // Avoid duplicates by ID
-  if (library.examples.some((e) => e.id === example.id)) {
-    return;
-  }
-
+  if (library.examples.some((e) => e.id === example.id)) return;
   library.examples.push(example);
-
-  // Index by work
   if (example.source_work) {
     const existing = library.workIndex.get(example.source_work) ?? [];
     existing.push(example);
     library.workIndex.set(example.source_work, existing);
   }
-
-  // Index by tags
   if (example.technique_tags) {
     for (const tag of example.technique_tags) {
       library.tags.add(tag);
@@ -88,9 +79,7 @@ export function registerReferenceExample(example: ReferenceExample): void {
 }
 
 export function registerReferenceExamples(examples: ReferenceExample[]): void {
-  for (const example of examples) {
-    registerReferenceExample(example);
-  }
+  for (const example of examples) registerReferenceExample(example);
 }
 
 // ============================================================
@@ -106,92 +95,39 @@ export interface RetrievalOptions {
   minQualityScore?: number;
 }
 
-export function retrieveReferenceExamples(
-  options: RetrievalOptions
-): ReferenceExample[] {
+export function retrieveReferenceExamples(options: RetrievalOptions): ReferenceExample[] {
   const { libraryId, mode, maxExamples = 5, tags, works, minQualityScore } = options;
   const library = libraries[libraryId];
-
-  if (!library) {
-    console.error(`Unknown reference library: ${libraryId}`);
-    return [];
-  }
+  if (!library) return [];
 
   let candidates = [...library.examples];
-
-  // Filter by quality score
   if (minQualityScore !== undefined) {
-    candidates = candidates.filter(
-      (e) => e.quality_score !== undefined && e.quality_score >= minQualityScore
-    );
+    candidates = candidates.filter((e) => e.quality_score !== undefined && e.quality_score >= minQualityScore);
   }
-
-  // Filter by works
   if (works && works.length > 0) {
     candidates = candidates.filter((e) => e.source_work && works.includes(e.source_work));
   }
-
-  // Filter by tags
   if (tags && tags.length > 0) {
-    candidates = candidates.filter((e) =>
-      e.technique_tags?.some((tag) => tags.includes(tag))
-    );
+    candidates = candidates.filter((e) => e.technique_tags?.some((tag) => tags.includes(tag)));
   }
-
-  // Sort by quality score if available
-  candidates.sort((a, b) => {
-    const scoreA = a.quality_score ?? 50;
-    const scoreB = b.quality_score ?? 50;
-    return scoreB - scoreA;
-  });
-
+  candidates.sort((a, b) => (a.quality_score ?? 50) - (b.quality_score ?? 50));
+  candidates.reverse();
   return candidates.slice(0, maxExamples);
 }
 
-export function retrieveByTags(
-  libraryId: ReferenceLibraryType,
-  tags: string[],
-  maxExamples: number = 5
-): ReferenceExample[] {
-  return retrieveReferenceExamples({
-    libraryId,
-    mode: 'keyword',
-    tags,
-    maxExamples,
-  });
+export function retrieveByTags(libraryId: ReferenceLibraryType, tags: string[], maxExamples = 5): ReferenceExample[] {
+  return retrieveReferenceExamples({ libraryId, mode: 'keyword', tags, maxExamples });
 }
 
-export function retrieveByWorks(
-  libraryId: ReferenceLibraryType,
-  works: string[],
-  maxExamples: number = 5
-): ReferenceExample[] {
-  return retrieveReferenceExamples({
-    libraryId,
-    mode: 'keyword',
-    works,
-    maxExamples,
-  });
+export function retrieveByWorks(libraryId: ReferenceLibraryType, works: string[], maxExamples = 5): ReferenceExample[] {
+  return retrieveReferenceExamples({ libraryId, mode: 'keyword', works, maxExamples });
 }
-
-// ============================================================
-// Query Interface
-// ============================================================
 
 export function getReferenceLibraryStats(): Record<ReferenceLibraryType, { count: number; tags: number }> {
   return {
-    'narrative-framework': {
-      count: libraries['narrative-framework'].examples.length,
-      tags: libraries['narrative-framework'].tags.size,
-    },
-    'visual-lens': {
-      count: libraries['visual-lens'].examples.length,
-      tags: libraries['visual-lens'].tags.size,
-    },
-    'writing-technique': {
-      count: libraries['writing-technique'].examples.length,
-      tags: libraries['writing-technique'].tags.size,
-    },
+    'narrative-framework': { count: libraries['narrative-framework'].examples.length, tags: libraries['narrative-framework'].tags.size },
+    'visual-lens': { count: libraries['visual-lens'].examples.length, tags: libraries['visual-lens'].tags.size },
+    'writing-technique': { count: libraries['writing-technique'].examples.length, tags: libraries['writing-technique'].tags.size },
   };
 }
 
@@ -211,67 +147,923 @@ export function clearLibrary(libraryId: ReferenceLibraryType): void {
 }
 
 // ============================================================
-// Preloaded Reference Examples
+// NARRATIVE FRAMEWORK EXAMPLES (20)
 // ============================================================
 
-// Chinese Classical Writing Techniques (金圣叹, 毛宗岗, 脂砚斋, 张竹坡)
-const chineseClassicalExamples: ReferenceExample[] = [
+const narrativeFrameworkExamples: ReferenceExample[] = [
+
+  // --- 中国叙事骨架 ---
+
   {
-    id: 'cc-jst-001',
-    title: '草蛇灰线·武松哨棒',
-    category: 'writing-technique',
-    content: '武松正带着哨棒起身去景阳冈，酒保追出来喊"阿呀，这是我家的酒发开了"。后文武松打虎时，哨棒折断，徒手打虎。前后呼应，伏笔浑然天成。',
-    technique_tags: ['草蛇灰线', '伏笔照应', '金圣叹'],
-    source_author: '施耐庵',
-    source_work: '水浒传',
+    id: 'nf-dream-001',
+    title: '红楼梦·家族兴衰结构',
+    category: 'narrative-framework',
+    content: '以贾府兴衰为经，以宝黛爱情为纬。家族命运与个人命运交织，最终繁华落尽，落了片白茫茫大地真干净。结构宏大而统一。',
+    technique_tags: ['家族叙事', '兴衰结构', '网状结构', '曹雪芹'],
+    source_author: '曹雪芹',
+    source_work: '红楼梦',
+    quality_score: 98,
+  },
+  {
+    id: 'nf-tianlong-001',
+    title: '天龙八部·三线并行交织',
+    category: 'narrative-framework',
+    content: '萧峰线、段誉线、虚竹线，三条人物线独立发展，后交织于少林寺大会。三线如辫子，最终合拢成一。',
+    technique_tags: ['多线并行', '人物交织', '金庸', '武侠结构'],
+    source_author: '金庸',
+    source_work: '天龙八部',
     quality_score: 95,
   },
   {
-    id: 'cc-jst-002',
-    title: '背面铺粉法·林冲娘子',
-    category: 'writing-technique',
-    content: '高衙内调戏林冲娘子，不直接写林冲愤怒，而写林冲"也横身在里八花九转"护住娘子。以旁观者反应衬主角处境。',
-    technique_tags: ['背面铺粉', '对比衬托', '金圣叹'],
+    id: 'nf-water-001',
+    title: '水浒传·单元连缀结构',
+    category: 'narrative-framework',
+    content: '一百单八将每人故事相对独立，以"逼"字为共同母题串联。单元故事如珠子，聚义厅为线，缀联成英雄群像。',
+    technique_tags: ['单元连缀', '群像结构', '施耐庵', '逼上梁山'],
     source_author: '施耐庵',
     source_work: '水浒传',
-    quality_score: 92,
-  },
-  {
-    id: 'cc-mzg-001',
-    title: '横云断山法·三顾茅庐',
-    category: 'writing-technique',
-    content: '刘备一顾茅庐，遇崔州平；崔州平论古今成败，笔势横绝。二顾茅庐，遇石广元、孟节公等，叙话别事。三顾时，直入草庐，笔墨顿然合拢。横云断山，妙在断处不断。',
-    technique_tags: ['横云断山', '结构布局', '毛宗岗'],
-    source_author: '罗贯中',
-    source_work: '三国演义',
     quality_score: 94,
   },
   {
-    id: 'cc-zyz-001',
-    title: '烘云托月法·王熙凤出场',
-    category: 'writing-technique',
-    content: '林黛玉入贾府，众人皆有限定描写。独有王熙凤，先写贾母笑道"他是我们这里有名的一个泼辣货"，再写彩绣辉煌，恍若神妃仙子。周围人物皆为烘托，独占云端。',
-    technique_tags: ['烘云托月', '人物塑造', '脂砚斋'],
-    source_author: '曹雪芹',
-    source_work: '红楼梦',
+    id: 'nf-threeking-001',
+    title: '三国演义·天下分合结构',
+    category: 'narrative-framework',
+    content: '合久必分，分久必合。魏蜀吴三国争鼎，以时间线为经，以战役为纬，最终归于晋一统。历史循环观为结构核心。',
+    technique_tags: ['历史叙事', '三分天下', '罗贯中', '循环结构'],
+    source_author: '罗贯中',
+    source_work: '三国演义',
+    quality_score: 93,
+  },
+  {
+    id: 'nf-jinping-001',
+    title: '金瓶梅·市井生活横截面',
+    category: 'narrative-framework',
+    content: '以西门庆一家的兴衰为窗口，透视整个晚明市井社会的风俗画卷。无英雄传奇，只有饮食男女家长里短，却成就了最深的世情写照。',
+    technique_tags: ['世情小说', '市井叙事', '兰陵笑笑生', '横截面结构'],
+    source_author: '兰陵笑笑生',
+    source_work: '金瓶梅',
+    quality_score: 95,
+  },
+  {
+    id: 'nf-biancheng-001',
+    title: '边城·田园牧歌结构',
+    category: 'narrative-framework',
+    content: '以湘西边城为纯美空间，以翠翠的爱情悲剧为主线，以自然美与人性美为底色，以无法抗拒的宿命的悲歌为结局。抒情诗般的叙事结构。',
+    technique_tags: ['田园牧歌', '抒情叙事', '沈从文', '边城'],
+    source_author: '沈从文',
+    source_work: '边城',
+    quality_score: 94,
+  },
+  {
+    id: 'nf-ego-001',
+    title: '狂人日记·日记体嵌套结构',
+    category: 'narrative-framework',
+    content: '正文以狂人日记构成，日记前附小序说明"余"整理故友遗稿。真实读者（余）与虚构狂人形成叙事层次，具有元小说意味。',
+    technique_tags: ['日记体', '嵌套叙事', '鲁迅', '疯癫叙事'],
+    source_author: '鲁迅',
+    source_work: '狂人日记',
+    quality_score: 93,
+  },
+
+  // --- 西方叙事骨架 ---
+
+  {
+    id: 'nf-odyssey-001',
+    title: '奥德赛·流浪与归返结构',
+    category: 'narrative-framework',
+    content: '英雄奥德修斯在特洛伊战争后流浪十年，历经奇遇，最终归返伊塔卡故土。流浪叙事成为西方文学的原型母题，影响了整个文学史。',
+    technique_tags: ['流浪叙事', '归返结构', '荷马', '史诗'],
+    source_author: '荷马',
+    source_work: '奥德赛',
+    quality_score: 98,
+  },
+  {
+    id: 'nf-edipus-001',
+    title: '俄狄浦斯王·发现与逆转结构',
+    category: 'narrative-framework',
+    content: '信使带来真相，发现即逆转。俄狄浦斯"发现"自己弑父娶母的那一刻，即命运逆转的高潮。亚里士多德称之为"发现即逆转"。',
+    technique_tags: ['发现与逆转', '悲剧结构', '索福克勒斯', '命运悲剧'],
+    source_author: '索福克勒斯',
+    source_work: '俄狄浦斯王',
+    quality_score: 97,
+  },
+  {
+    id: 'nf-don-quixote-001',
+    title: '堂吉诃德·反英雄流浪汉结构',
+    category: 'narrative-framework',
+    content: '堂吉诃德出游三次，一次比一次荒诞，最终被现实击败。骑士的幻觉与现实的碰撞构成反讽，游侠叙事在这里遭到系统性的消解与重建。',
+    technique_tags: ['流浪汉小说', '反英雄', '塞万提斯', '反讽结构'],
+    source_author: '塞万提到斯',
+    source_work: '堂吉诃德',
     quality_score: 96,
   },
   {
-    id: 'cc-zzp-001',
-    title: '一击两鸣·刘姥姥一进荣国府',
-    category: 'writing-technique',
-    content: '刘姥姥进荣国府，一进写其卑微、凤姐之富；二进写其粗鄙、贾母之贵。同一人物，两番进府，互相比照，一击而两鸣。',
-    technique_tags: ['一击两鸣', '结构布局', '张竹坡'],
-    source_author: '曹雪芹',
-    source_work: '红楼梦',
-    quality_score: 93,
+    id: 'nf-bildungs-001',
+    title: '远大前程·成长小说结构',
+    category: 'narrative-framework',
+    content: '匹普从乡间孤儿到上进青年的成长历程：受到贵族小姐郝薇香的提拔→发现真相→自我重建。狄更斯将社会批判融入成长叙事。',
+    technique_tags: ['成长小说', '社会批判', '狄更斯', ' bildungsroman'],
+    source_author: '狄更斯',
+    source_work: '远大前程',
+    quality_score: 94,
+  },
+  {
+    id: 'nf-anna-001',
+    title: '安娜·卡列尼娜·双线对位结构',
+    category: 'narrative-framework',
+    content: '安娜线与列文线平行发展，安娜追求激情之爱走向毁灭，列文追求精神信仰找到答案。两条线索构成道德对话，互相映照。',
+    technique_tags: ['双线叙事', '对位结构', '托尔斯泰', '社会小说'],
+    source_author: '托尔斯泰',
+    source_work: '安娜·卡列尼娜',
+    quality_score: 97,
+  },
+  {
+    id: 'nf-100yrs-001',
+    title: '百年孤独·循环时间结构',
+    category: 'narrative-framework',
+    content: '布恩迪亚家族七代人的历史呈螺旋循环：名字重复、命运重复、历史自我重复。马尔克斯将拉丁美洲的历史轮回升华为魔幻的时间哲学。',
+    technique_tags: ['循环时间', '家族史诗', '马尔克斯', '魔幻现实主义'],
+    source_author: '马尔克斯',
+    source_work: '百年孤独',
+    quality_score: 98,
+  },
+  {
+    id: 'nf-us-001',
+    title: '美国·蒙太奇式全景结构',
+    category: 'narrative-framework',
+    content: '多斯·帕索斯以蒙太奇手法处理美国建国到二战的历史：新闻标题、传记片段、意识流段落、电影字幕剪接拼贴，拒绝传统情节的连贯性。',
+    technique_tags: ['蒙太奇叙事', '全景叙事', '多斯·帕索斯', '美国'],
+    source_author: '多斯·帕索斯',
+    source_work: '美国',
+    quality_score: 91,
+  },
+  {
+    id: 'nf-divine-001',
+    title: '神曲·地狱层层递进结构',
+    category: 'narrative-framework',
+    content: '但丁由维吉尔引导游历地狱九圈、炼狱七层，抵达天堂见到贝雅特丽齐。地狱结构象征灵魂罪恶的程度层层加深，是中世纪神学世界观的叙事化。',
+    technique_tags: ['地狱叙事', '寓言结构', '但丁', '朝圣文学'],
+    source_author: '但丁',
+    source_work: '神曲',
+    quality_score: 97,
+  },
+  {
+    id: 'nf-south-001',
+    title: '喧嚣与骚动·多视角碎片结构',
+    category: 'narrative-framework',
+    content: '班杰明、昆丁、凯蒂、迪尔西四个视角讲述同一家庭的分崩离析。时间顺序被打乱，叙事本身即精神崩溃的形式映射。',
+    technique_tags: ['多视角', '碎片叙事', '福克纳', '约克纳帕塔法'],
+    source_author: '福克纳',
+    source_work: '喧嚣与骚动',
+    quality_score: 96,
+  },
+  {
+    id: 'nf-lost-001',
+    title: '追寻逝·非自愿记忆结构',
+    category: 'narrative-framework',
+    content: '叙述者在现实与记忆之间穿梭，由感官触发点（玛德莱娜蛋糕）引发无意识回忆。叙事时间不再是线性，而由心理时间支配。',
+    technique_tags: ['非自愿记忆', '心理时间', '普鲁斯特', '意识流'],
+    source_author: '普鲁斯特',
+    source_work: '追寻逝水年华',
+    quality_score: 97,
+  },
+  {
+    id: 'nf-infinite-001',
+    title: '小径分叉的花园·迷宫叙事结构',
+    category: 'narrative-framework',
+    content: '一篇关于迷宫的小说本身成为迷宫：崔鹏的曾祖是迷宫制造者，也是无限小说的作者。博尔赫斯以叙事讨论叙事的可能性与限度。',
+    technique_tags: ['元小说', '迷宫叙事', '博尔赫斯', '互文性'],
+    source_author: '博尔赫斯',
+    source_work: '小径分叉的花园',
+    quality_score: 96,
+  },
+  {
+    id: 'nf-gatsby-001',
+    title: '了不起的盖茨比·见证者叙述结构',
+    category: 'narrative-framework',
+    content: '尼克作为叙述者，以旁观者身份见证盖茨比的美国梦悲剧。叙事距离的设置使盖茨比始终保持神秘，叙述者与读者的认知同步。',
+    technique_tags: ['见证者叙述', '美国梦', '菲茨杰拉德', '叙事距离'],
+    source_author: '菲茨杰拉德',
+    source_work: '了不起的盖茨比',
+    quality_score: 95,
   },
 ];
 
-// Chinese Modern Wuxia Techniques (金庸, 古龙)
-const chineseModernExamples: ReferenceExample[] = [
+// ============================================================
+// VISUAL LENS EXAMPLES (28)
+// ============================================================
+
+const visualLensExamples: ReferenceExample[] = [
+
+  // --- 中国画面镜头 ---
+
   {
-    id: 'cm-jy-001',
+    id: 'vl-wulin-001',
+    title: '金庸·光明顶动作描写',
+    category: 'visual-lens',
+    content: '张无忌一人对崆峒派、华山派、昆仑派、正反两仪刀剑。动作描写如绘画：一分为二、二分为四、四分为八，层层递加，视觉丰富如棋盘。',
+    technique_tags: ['动作描写', '武侠动作', '金庸', '视觉层次'],
+    source_author: '金庸',
+    source_work: '倚天屠龙记',
+    quality_score: 94,
+  },
+  {
+    id: 'vl-gulong-001',
+    title: '古龙·兰亭集序意境描写',
+    category: 'visual-lens',
+    content: '李寻欢与林诗音分别，十年来各自回忆。文字如山水画留白："她只是静静地站在阴影里，像一幅淡墨山水。"意境大于情节。',
+    technique_tags: ['意境描写', '留白', '古龙', '写意'],
+    source_author: '古龙',
+    source_work: '多情剑客无情剑',
+    quality_score: 95,
+  },
+  {
+    id: 'vl-wushen-001',
+    title: '水浒传·武松打虎白描',
+    category: 'visual-lens',
+    content: '武松明知山有虎偏向虎山行，酒后上冈。"就这拳大的疙瘩肉"一节，老虎的动作与武松的应对，写得层次分明，如在目前。',
+    technique_tags: ['白描', '动作描写', '施耐庵', '水浒传'],
+    source_author: '施耐庵',
+    source_work: '水浒传',
+    quality_score: 93,
+  },
+  {
+    id: 'vl-dream-001',
+    title: '红楼梦·王熙凤出场先声夺人',
+    category: 'visual-lens',
+    content: '林黛玉入贾府，众人皆有限定描写。独有王熙凤，先写贾母笑道"他是我们这里有名的一个泼辣货"，再写彩绣辉煌，恍若神妃仙子。先声夺人。',
+    technique_tags: ['先声夺人', '人物出场', '曹雪芹', '侧面描写'],
+    source_author: '曹雪芹',
+    source_work: '红楼梦',
+    quality_score: 95,
+  },
+  {
+    id: 'vl-sports-001',
+    title: '边城·端午赛龙舟风俗画',
+    category: 'visual-lens',
+    content: '写端午赛龙舟、捉鸭子：""赢了的人，脸上的骄傲。""文字如民俗画卷，湘西端午习俗跃然纸上，生活质感扑面而来。',
+    technique_tags: ['风俗画', '民俗描写', '沈从文', '边城'],
+    source_author: '沈从文',
+    source_work: '边城',
+    quality_score: 92,
+  },
+  {
+    id: 'vl-redmang-001',
+    title: '红高粱家族·高粱地感官轰炸',
+    category: 'visual-lens',
+    content: '"九蒸九熘的高粱酒，洗亮了的黑淤泥"——莫言调动视觉、嗅觉、味觉，将高粱地写成一块活着的原始土地，生命在感官中蓬勃而出。',
+    technique_tags: ['感官描写', '魔幻现实主义', '莫言', '高粱'],
+    source_author: '莫言',
+    source_work: '红高粱家族',
+    quality_score: 94,
+  },
+  {
+    id: 'vl-ah-001',
+    title: '阿Q正传·刑罚描写',
+    category: 'visual-lens',
+    content: '鲁迅写阿Q被绑赴刑场的感受："二十年后又是一条好汉"的心理支撑，与围观群众的看客心态，以及"上了绑"的屈辱，笔力千钧。',
+    technique_tags: ['白描', '鲁迅', '国民性批判', '看客'],
+    source_author: '鲁迅',
+    source_work: '阿Q正传',
+    quality_score: 93,
+  },
+
+  // --- 西方画面镜头 ---
+
+  {
+    id: 'vl-homer-001',
+    title: '伊利亚特·战神阿基琉斯愤怒开场',
+    category: 'visual-lens',
+    content: '"歌唱吧，女神，歌唱裴琉斯之子阿基琉斯的愤怒"——荷马以英雄愤怒开篇，战马、盔甲、刀剑意象如电影镜头逐帧展开，史诗的视觉基调就此奠定。',
+    technique_tags: ['史诗意象', '荷马', '战争描写', '视觉开篇'],
+    source_author: '荷马',
+    source_work: '伊利亚特',
+    quality_score: 96,
+  },
+  {
+    id: 'vl-heming-001',
+    title: '永别了武器·斗牛场面',
+    category: 'visual-lens',
+    content: '"红布在公牛面前抖动，他蹄子刨地，蹄子下的沙土飞溅如血。"动作精准如解剖，感官细节密集，读者如在现场，见证力与美的仪式。',
+    technique_tags: ['感官细节', '动作描写', '海明威', '斗牛'],
+    source_author: '海明威',
+    source_work: '永别了武器',
+    quality_score: 93,
+  },
+  {
+    id: 'vl-joyce-001',
+    title: '尤利西斯·莫莉的意识流感官',
+    category: 'visual-lens',
+    content: '莫莉的意识在清晨床上流淌：肉体的感觉、花园的气息、记忆的片段，无标点的内心独白将感官与意识交织成一片浑然。',
+    technique_tags: ['意识流', '感官描写', '乔伊斯', '内心独白'],
+    source_author: '乔伊斯',
+    source_work: '尤利西斯',
+    quality_score: 97,
+  },
+  {
+    id: 'vl-tolstoy-001',
+    title: '安娜·卡列尼娜·赛马场悲剧分切',
+    category: 'visual-lens',
+    content: '弗鲁弗鲁在障碍前的跌倒、安娜的惊恐、弗伦斯基的坠马——托尔斯泰以电影分切般的精确，将赛马场写成安娜精神崩溃的象征仪式。',
+    technique_tags: ['场景描写', '托尔斯泰', '象征', '悲剧预兆'],
+    source_author: '托尔斯泰',
+    source_work: '安娜·卡列尼娜',
+    quality_score: 95,
+  },
+  {
+    id: 'vl-woolf-001',
+    title: '达洛维夫人·伦敦清晨感官通感',
+    category: 'visual-lens',
+    content: '达洛维夫人在伦敦街头买花——花店的色彩、街道的声音、空气的气息，伍尔夫以感官通感将人物意识与城市空间编织在一起。',
+    technique_tags: ['通感', '意识流', '伍尔夫', '都市空间'],
+    source_author: '伍尔夫',
+    source_work: '达洛维夫人',
+    quality_score: 96,
+  },
+  {
+    id: 'vl-conrad-001',
+    title: '黑暗之心·丛林意象',
+    category: 'visual-lens',
+    content: '库尔茨在丛林深处的最后呼喊："可怕呀可怕！"——康拉德以丛林的黑暗意象，构建了一个关于人类文明深度最黑暗的隐喻。',
+    technique_tags: ['象征', '丛林意象', '康拉德', '黑暗之心'],
+    source_author: '康拉德',
+    source_work: '黑暗之心',
+    quality_score: 95,
+  },
+  {
+    id: 'vl-marquez-001',
+    title: '百年孤独·冰块开场',
+    category: 'visual-lens',
+    content: '"多年以后，面对行刑队，奥雷里亚诺·布恩迪亚上校将会回想起父亲带他去见识冰块的那个遥远的下午。"——马尔克斯以冰块的惊奇描写，建立魔幻的感知基调。',
+    technique_tags: ['魔幻现实主义', '开场意象', '马尔克斯', '冰块'],
+    source_author: '马尔克斯',
+    source_work: '百年孤独',
+    quality_score: 98,
+  },
+  {
+    id: 'vl-dickens-001',
+    title: '双城记·断头台描写',
+    category: 'visual-lens',
+    content: '狄更斯写断头台："那机器，咝——它比任何东西都更干净。"平静的语调与恐怖的内容之间的反差，令人毛骨悚然。',
+    technique_tags: ['反讽', '场面描写', '狄更斯', '法国大革命'],
+    source_author: '狄更斯',
+    source_work: '双城记',
+    quality_score: 92,
+  },
+  {
+    id: 'vl-faulkner-001',
+    title: '押沙龙·约克纳帕塔法地理诗学',
+    category: 'visual-lens',
+    content: '福克纳将约克纳帕塔塔县写成有生命的地理存在：泥土、河流、房屋，无不渗透着历史的罪恶与记忆的重量。空间即叙事。',
+    technique_tags: ['地域描写', '福克纳', '约克纳帕塔法', '空间叙事'],
+    source_author: '福克纳',
+    source_work: '押沙龙，押沙龙！',
+    quality_score: 94,
+  },
+  {
+    id: 'vl-kafka-001',
+    title: '变形记·格里高尔变虫',
+    category: 'visual-lens',
+    content: '早晨醒来变成大甲虫——卡夫卡以平静、不带惊讶的语调描写荒诞：起床、照镜子、尝试出门。语调与内容的反差制造了最大的恐怖。',
+    technique_tags: ['荒诞描写', '卡夫卡', '反讽', '感官细节'],
+    source_author: '卡夫卡',
+    source_work: '变形记',
+    quality_score: 97,
+  },
+  {
+    id: 'vl-dostoevsky-001',
+    title: '罪与罚·内心分裂的双重描写',
+    category: 'visual-lens',
+    content: '拉斯科尔尼科夫犯罪后的心理分裂：发烧、梦魇、呓语与冷静、算计、阅读交替。陀思妥耶夫斯基将心理活动写成可感知的视觉场景。',
+    technique_tags: ['心理描写', '陀思妥耶夫斯基', '分裂', '紧张'],
+    source_author: '陀思妥耶夫斯基',
+    source_work: '罪与罚',
+    quality_score: 96,
+  },
+  {
+    id: 'vl-hawthorn-001',
+    title: '红字·森林场景',
+    category: 'visual-lens',
+    content: '森林中珠儿问："父亲，还不跟我们一起走吗？"——霍桑以森林的昏暗与清教社区的压抑对照，赋予自然场景以道德意义。',
+    technique_tags: ['象征', '场景对照', '霍桑', '红字'],
+    source_author: '霍桑',
+    source_work: '红字',
+    quality_score: 92,
+  },
+  {
+    id: 'vl-dosto-002',
+    title: '卡拉马佐夫兄弟·宗教大法官场景',
+    category: 'visual-lens',
+    content: '大法官以火把、阴影、深渊的意象与基督对话，赋予哲学论辩以视觉戏剧性——火光下的面容、覆盖的面具、深渊的边缘，构成一出视觉化的思想剧。',
+    technique_tags: ['象征主义', '场景描写', '陀思妥耶夫斯基', '宗教哲学'],
+    source_author: '陀思妥耶夫斯基',
+    source_work: '卡拉马佐夫兄弟',
+    quality_score: 97,
+  },
+  {
+    id: 'vl-twain-001',
+    title: '哈克贝利·密西西比河',
+    category: 'visual-lens',
+    content: '密西西比河在马克·吐温笔下是有生命的：它的颜色、它的气味、它的潮汐，构成了美国文学中最有力的自然意象之一，是自由的象征。',
+    technique_tags: ['自然意象', '象征', '马克·吐温', '美国文学'],
+    source_author: '马克·吐温',
+    source_work: '哈克贝利·费恩历险记',
+    quality_score: 93,
+  },
+  {
+    id: 'vl-melville-001',
+    title: '白鲸·鲸鱼意象',
+    category: 'visual-lens',
+    content: '抹香鲸在深海中潜泳——"它有多白啊"——麦尔维尔将白鲸写成自然界最纯粹又最恐怖的力量，亚哈船长的执念与白鲸的纯白构成终极对峙。',
+    technique_tags: ['象征', '海洋描写', '麦尔维尔', '白鲸'],
+    source_author: '麦尔维尔',
+    source_work: '白鲸',
+    quality_score: 96,
+  },
+  {
+    id: 'vl-orhan-001',
+    title: '我的名字叫红·细密画技法',
+    category: 'visual-lens',
+    content: '帕慕克将土耳其细密画的平面性与现代小说的深度心理描写相结合，赋予视觉艺术以叙事的时间维度，是"概念小说"的典范实践。',
+    technique_tags: ['视觉艺术', '帕慕克', '细密画', '元小说'],
+    source_author: '帕慕克',
+    source_work: '我的名字叫红',
+    quality_score: 94,
+  },
+  {
+    id: 'vl-mishima-001',
+    title: '金枝楼·美学仪式描写',
+    category: 'visual-lens',
+    content: '三岛由纪夫对剑道、相扑的描写带有仪式化的美感——身体的美与思想的深在日本传统美学中被三岛推向极致，是"肉体性"美学的典范。',
+    technique_tags: ['仪式描写', '美学', '三岛由纪夫', '身体'],
+    source_author: '三岛由纪夫',
+    source_work: '金枝楼',
+    quality_score: 93,
+  },
+  {
+    id: 'vl-pasternak-001',
+    title: '日瓦戈医生·拉里窗外雪景',
+    category: 'visual-lens',
+    content: '日瓦戈医生在拉里的窗前看雪——"雪在无声地落着，世界上所有的人都睡着了。"帕斯捷尔纳克将俄罗斯的冬天写成最深刻的情感风景。',
+    technique_tags: ['自然描写', '俄罗斯文学', '帕斯捷尔纳克', '诗意'],
+    source_author: '帕斯捷尔纳克',
+    source_work: '日瓦戈医生',
+    quality_score: 92,
+  },
+  {
+    id: 'vl-rou-001',
+    title: '追忆似水年华·玛德莱娜蛋糕感官触发',
+    category: 'visual-lens',
+    content: '将玛德莱娜蛋糕浸入茶水中，"一种舒坦的快感""向我袭来"，感官细节的精确性使无意识记忆的触发具有无可抗拒的真实性。',
+    technique_tags: ['感官细节', '记忆触发', '普鲁斯特', '非自愿记忆'],
+    source_author: '普鲁斯特',
+    source_work: '追寻逝水年华',
+    quality_score: 98,
+  },
+  {
+    id: 'vl-dines-001',
+    title: '都柏林人·收场白冷淡语调',
+    category: 'visual-lens',
+    content: '《死者》的结尾："星星继续闪耀在她的脸上和身上。但她正在渐渐地感受到。"——乔伊斯以最淡的笔调写最深的情感，余音三日。',
+    technique_tags: ['意象', '乔伊斯', '死者', '平淡结语'],
+    source_author: '乔伊斯',
+    source_work: '都柏林人',
+    quality_score: 97,
+  },
+];
+
+// ============================================================
+// WRITING TECHNIQUE EXAMPLES (100+)
+// ============================================================
+
+const writingTechniqueExamples: ReferenceExample[] = [
+
+  // ============================================================
+  // A. 中国古典评点技法 (金圣叹、毛宗岗、脂砚斋、张竹坡) - 26条
+  // ============================================================
+
+  {
+    id: 'wt-jst-001',
+    title: '草蛇灰线·武松哨棒',
+    category: 'writing-technique',
+    content: '武松正带着哨棒起身去景阳冈，酒保追出来喊"阿呀，这是我家的酒发开了"。后文武松打虎时，哨棒折断，徒手打虎。前后呼应，伏笔浑然天成。',
+    technique_tags: ['草蛇灰线', '伏笔照应', '金圣叹', '水浒传'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-jst-002',
+    title: '背面铺粉法·林冲娘子',
+    category: 'writing-technique',
+    content: '高衙内调戏林冲娘子，不直接写林冲愤怒，而写林冲"也横身在里八花九转"护住娘子。以旁观者反应衬主角处境。',
+    technique_tags: ['背面铺粉', '对比衬托', '金圣叹', '侧面描写'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-jst-003',
+    title: '横云断山法·三顾茅庐',
+    category: 'writing-technique',
+    content: '刘备一顾茅庐，遇崔州平，论古今成败，笔势横绝。二顾茅庐，遇石广元、孟节公，叙话别事。三顾时，直入草庐，笔墨顿然合拢。横云断山，妙在断处不断。',
+    technique_tags: ['横云断山', '结构布局', '金圣叹', '节奏'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-jst-004',
+    title: '弄引法·引首小段落',
+    category: 'writing-technique',
+    content: '在正题之前先写一段相关小事作为铺垫引导，如同乐章前的小调。金圣叹评武松打虎前，先写武松在酒店饮酒吃菜，酒保的絮叨，是为引出打虎的蓄势。',
+    technique_tags: ['弄引法', '铺垫', '金圣叹', '蓄势'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 90,
+  },
+  {
+    id: 'wt-jst-005',
+    title: '獭尾法·打虎后余波',
+    category: 'writing-technique',
+    content: '在主要事件结束后，缀以小事收尾，如同水獭入水后留下尾巴的涟漪。武松打虎后，游人抬尸体、清风间的续写，皆为獭尾，使故事收束自然。',
+    technique_tags: ['獭尾法', '收尾', '金圣叹', '余韵'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 88,
+  },
+  {
+    id: 'wt-jst-006',
+    title: '正犯法·同中写异',
+    category: 'writing-technique',
+    content: '有意写相似或相同的事件加以比较，同中见异。如武松打虎与李逵杀虎，打虎各有不同遭遇，金圣叹赞叹"正犯法"之妙在于"同树异枝、同枝异叶"。',
+    technique_tags: ['正犯法', '对比', '金圣叹', '变化'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 91,
+  },
+  {
+    id: 'wt-jst-007',
+    title: '略犯法·轻触即离',
+    category: 'writing-technique',
+    content: '与正犯法相近，但相似程度较低，只是略微触碰。如两处写酒醉状态，一深入一浅出，变化生于毫厘之间。',
+    technique_tags: ['略犯法', '变化', '金圣叹', '节奏'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 86,
+  },
+  {
+    id: 'wt-jst-008',
+    title: '鸾胶续弦法·情节衔接',
+    category: 'writing-technique',
+    content: '前后情节巧妙衔接，如同用鸾胶连接断弦。林冲被押解野猪林后，鲁智深出场护送，前文董超、薛霸的迫害与后文营救，鸾胶续弦，浑然天成。',
+    technique_tags: ['鸾胶续弦', '衔接', '金圣叹', '连贯'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 89,
+  },
+  {
+    id: 'wt-jst-009',
+    title: '绵针泥刺法·绵里藏针',
+    category: 'writing-technique',
+    content: '指文字表面平和而内含针刺，绵里藏针。如武松在张都监府中对答恭敬，实则心中怒火中烧，金圣叹评此技法"绵里藏针，刺人不觉"。',
+    technique_tags: ['绵针泥刺', '讽刺', '金圣叹', '双关'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 87,
+  },
+  {
+    id: 'wt-jst-010',
+    title: '倒卷帘法·倒叙入题',
+    category: 'writing-technique',
+    content: '从事件的结果或中途倒叙回来，如同卷帘由上而下。如先写武松打虎归来，再回头写上冈之前的饮酒，此法可制造悬念，延长阅读期待。',
+    technique_tags: ['倒卷帘', '倒叙', '金圣叹', '悬念'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 88,
+  },
+  {
+    id: 'wt-jst-011',
+    title: '渡白法·旁写补正',
+    category: 'writing-technique',
+    content: '通过旁人的叙述或反应，间接交代主要情节。如酒店中酒客对武松的议论，是为渡白，以侧写补正写之不足。',
+    technique_tags: ['渡白法', '侧面描写', '金圣叹', '间接叙事'],
+    source_author: '金圣叹',
+    source_work: '水浒传评点',
+    quality_score: 85,
+  },
+  {
+    id: 'wt-zyz-001',
+    title: '烘云托月法·王熙凤出场',
+    category: 'writing-technique',
+    content: '林黛玉入贾府，众人皆有限定描写。独有王熙凤，先写贾母笑道"他是我们这里有名的一个泼辣货"，再写彩绣辉煌，恍若神妃仙子。周围人物皆为烘托，独占云端。',
+    technique_tags: ['烘云托月', '人物塑造', '脂砚斋', '侧面描写'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-zyz-002',
+    title: '一击两鸣·一笔双雕',
+    category: 'writing-technique',
+    content: '一句话或一个动作同时关涉两件事物，取得双重效果。如"黛玉葬花"，一写黛玉的多愁，一写花的命运，一击两鸣。',
+    technique_tags: ['一击两鸣', '双关', '脂砚斋', '多义'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-zyz-003',
+    title: '千里伏脉·远距离伏笔',
+    category: 'writing-technique',
+    content: '在前文埋下的线索，绵延至很后面才显现作用，如同千里之外仍有脉搏跳动。脂砚斋特别重视这种远距离伏笔的经营，如秦可卿卧室的描写伏后文命案。',
+    technique_tags: ['千里伏脉', '伏笔', '脂砚斋', '草蛇灰线'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-zyz-004',
+    title: '谐音法·元迎探惜',
+    category: 'writing-technique',
+    content: '利用汉字谐音关系设置多重含义。"元春、迎春、探春、惜春"谐音"原应叹息"，人物的结局早已写在名字里，构成庞大的隐喻网络。',
+    technique_tags: ['谐音', '命名隐喻', '脂砚斋', '曹雪芹'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-zyz-005',
+    title: '拆字法·姓名解密',
+    category: 'writing-technique',
+    content: '通过分析汉字结构暗藏玄机。如"甄士隐"谐音"真事隐"，"贾雨村"谐音"假语村言"，脂砚斋以此揭示曹雪芹命名的深意。',
+    technique_tags: ['拆字', '谐音', '脂砚斋', '隐喻'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-zyz-006',
+    title: '冷热映衬·繁华与悲凉',
+    category: 'writing-technique',
+    content: '以冷寂场景映衬热烈场面，或以热烈场景反衬人物内心的悲凉。脂砚斋特别关注大观园热闹与结局凄凉的强烈对比，此为"冷热映衬"之极致。',
+    technique_tags: ['冷热映衬', '对比', '脂砚斋', '反讽'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 91,
+  },
+  {
+    id: 'wt-zyz-007',
+    title: '追魂摄影·瞬间神态捕捉',
+    category: 'writing-technique',
+    content: '将人物的神情动态捕捉得入木三分，如同为其灵魂拍照。如黛玉听《牡丹亭》"如花美眷，似水流年"的反应，脂砚斋评"一字一泪，泣尽《红楼梦》"。',
+    technique_tags: ['追魂摄影', '神态描写', '脂砚斋', '细节'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 90,
+  },
+  {
+    id: 'wt-zyz-008',
+    title: '写真法·形神兼备',
+    category: 'writing-technique',
+    content: '对人物进行精确传神的描写，不仅形似更求神似。如刘姥姥进大观园，脂砚斋批"真真写得出"，写出人物灵魂。',
+    technique_tags: ['写真', '人物描写', '脂砚斋', '传神'],
+    source_author: '脂砚斋',
+    source_work: '红楼梦评点',
+    quality_score: 89,
+  },
+  {
+    id: 'wt-mzg-001',
+    title: '奇峰对插·对照张皇',
+    category: 'writing-technique',
+    content: '指两件性质相反或相对的事情同时并进，形成鲜明对照。如曹操与刘备的对比、魏蜀吴三国的对峙，以奇峰对插制造戏剧张力。',
+    technique_tags: ['奇峰对插', '对照', '毛宗岗', '人物对比'],
+    source_author: '毛宗岗',
+    source_work: '三国演义评点',
+    quality_score: 91,
+  },
+  {
+    id: 'wt-mzg-002',
+    title: '笙箫夹鼓·张弛有度',
+    category: 'writing-technique',
+    content: '以轻柔之笔写激烈之事，如同笙箫之声夹杂着战鼓。评赤壁之战前诸葛亮的悠闲草堂与后文战火纷飞，形成张弛有致的节奏。',
+    technique_tags: ['笙箫夹鼓', '节奏', '毛宗岗', '张弛'],
+    source_author: '毛宗岗',
+    source_work: '三国演义评点',
+    quality_score: 90,
+  },
+  {
+    id: 'wt-mzg-003',
+    title: '寒冰破热·以冷衬热',
+    category: 'writing-technique',
+    content: '在热烈的场景中突然插入冷峻一笔，打破单一的情绪氛围。如赤壁火攻之际，突然插入曹操的败走华容道，冷热交替，张力顿生。',
+    technique_tags: ['寒冰破热', '对比', '毛宗岗', '节奏'],
+    source_author: '毛宗岗',
+    source_work: '三国演义评点',
+    quality_score: 89,
+  },
+  {
+    id: 'wt-mzg-004',
+    title: '伏笔照应·草蛇灰线',
+    category: 'writing-technique',
+    content: '前面埋下的线索后面必有照应，前面出现的人物后面必有其用。毛宗岗强调《三国演义》结构上的精心设计，草蛇灰线，贯穿全书。',
+    technique_tags: ['伏笔照应', '结构', '毛宗岗', '连贯'],
+    source_author: '毛宗岗',
+    source_work: '三国演义评点',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-mzg-005',
+    title: '反衬法·以宾衬主',
+    category: 'writing-technique',
+    content: '以乙衬甲，贬乙以褒甲。毛宗岗常用此法评点人物对比，如以周瑜衬诸葛亮，以曹操衬刘备，反衬之中见高低。',
+    technique_tags: ['反衬法', '对照', '毛宗岗', '人物塑造'],
+    source_author: '毛宗岗',
+    source_work: '三国演义评点',
+    quality_score: 88,
+  },
+  {
+    id: 'wt-zzp-001',
+    title: '穿插法·多线交织',
+    category: 'writing-technique',
+    content: '多条情节线索交织并进，你方唱罢我登场。张竹坡特别重视《金瓶梅》情节网络的复杂编织，穿插如织，构成生活的立体感。',
+    technique_tags: ['穿插法', '多线叙事', '张竹坡', '结构'],
+    source_author: '张竹坡',
+    source_work: '金瓶梅评点',
+    quality_score: 90,
+  },
+  {
+    id: 'wt-zzp-002',
+    title: '曲笔法·旁敲侧击',
+    category: 'writing-technique',
+    content: '不直写其事而曲写之，以旁敲侧击达到目的。如写西门庆之恶，不直接评判，而以旁人的闲言碎语曲折透露。',
+    technique_tags: ['曲笔法', '讽刺', '张竹坡', '间接叙事'],
+    source_author: '张竹坡',
+    source_work: '金瓶梅评点',
+    quality_score: 87,
+  },
+
+  // ============================================================
+  // B. 中国古典诗词技法 - 15条
+  // ============================================================
+
+  {
+    id: 'wt-poetry-001',
+    title: '赋比兴·诗经三法',
+    category: 'writing-technique',
+    content: '赋为直陈其事，比为借物喻人，兴为托物起兴。屈原《橘颂》以橘起兴实为自喻，《诗经·关雎》以雎鸠起兴引出君子好逑，是中国诗歌最基本的表达手法。',
+    technique_tags: ['赋比兴', '诗经', '中国诗歌', '起兴'],
+    source_author: '无名氏',
+    source_work: '诗经',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-poetry-002',
+    title: '起承转合·绝句结构',
+    category: 'writing-technique',
+    content: '起为开篇破题，承为承接推进，转为转折变化，合为收束点题。如杜甫《绝句》"两个黄鹂鸣翠柳"——起句写景，承句写景上青天，转句写眼下春暖，开合之间见章法。',
+    technique_tags: ['起承转合', '结构', '杜甫', '律诗'],
+    source_author: '范德玑',
+    source_work: '诗格',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-poetry-003',
+    title: '情景交融·一切景语皆情语',
+    category: 'writing-technique',
+    content: '主观之情与客观之景相互渗透，融为一体。如王维《山居秋暝》"明月松间照，清泉石上流"，景即是情，情即是景，无痕对接。',
+    technique_tags: ['情景交融', '王维', '意境', '中国诗歌'],
+    source_author: '王维',
+    source_work: '山居秋暝',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-poetry-004',
+    title: '虚实相生·以虚写实',
+    category: 'writing-technique',
+    content: '虚为想象、梦境、回忆、未来；实为眼前景象、真实描写。如李商隐《锦瑟》"庄生晓梦迷蝴蝶，望帝春心托杜鹃"，以梦虚写现实之困顿，虚实相生。',
+    technique_tags: ['虚实相生', '李商隐', '梦境', '中国诗歌'],
+    source_author: '李商隐',
+    source_work: '锦瑟',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-poetry-005',
+    title: '以动衬静·蝉噪林逾静',
+    category: 'writing-technique',
+    content: '以动态的描写衬托静态的意境。如王籍《入若耶溪》"蝉噪林逾静，鸟鸣山更幽"，以蝉噪鸟鸣反衬山林幽静，以动写静使静境更深。',
+    technique_tags: ['以动衬静', '动静相生', '王籍', '中国诗歌'],
+    source_author: '王籍',
+    source_work: '入若耶溪',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-poetry-006',
+    title: '托物言志·爱莲说',
+    category: 'writing-technique',
+    content: '借某一事物为载体，寄托作者的情志抱负。如周敦颐《爱莲说》以莲花"出淤泥而不染"寄托君子之志，于平常事物中见高洁品格。',
+    technique_tags: ['托物言志', '象征', '周敦颐', '咏物'],
+    source_author: '周敦颐',
+    source_work: '爱莲说',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-poetry-007',
+    title: '用典·借古讽今',
+    category: 'writing-technique',
+    content: '引用古代故事或前人诗文成语以表达当前情意。如辛弃疾《永遇乐·京口北固亭怀古》，连用孙权、刘裕、佛狸祠等典故，借古讽今，感慨深沉。',
+    technique_tags: ['用典', '典故', '辛弃疾', '怀古'],
+    source_author: '辛弃疾',
+    source_work: '永遇乐',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-poetry-008',
+    title: '对仗·律诗之美',
+    category: 'writing-technique',
+    content: '上下两句在词性、结构、声韵等方面的相互对应。如杜甫《登高》"无边落木萧萧下，不尽长江滚滚来"，对仗工整，音韵和谐，构成律诗的形式美感。',
+    technique_tags: ['对仗', '律诗', '杜甫', '形式美'],
+    source_author: '杜甫',
+    source_work: '登高',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-poetry-009',
+    title: '意象叠加·天净沙秋思',
+    category: 'writing-technique',
+    content: '将多个意象并置，不加说明，让它们相互映照形成意境。马致远《天净沙·秋思》将枯藤、老树、昏鸦、古道、西风、瘦马七个意象叠加，创造出深远的悲秋意境。',
+    technique_tags: ['意象叠加', '元曲', '马致远', '意境'],
+    source_author: '马致远',
+    source_work: '天净沙·秋思',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-poetry-010',
+    title: '留白·此时无声胜有声',
+    category: 'writing-technique',
+    content: '在诗文中留下空白，不写满、不说尽，让读者以想象补充。如李商隐"此情可待成追忆，只是当时已惘然"，以"惘然"留下无尽余韵。',
+    technique_tags: ['留白', '余韵', '李商隐', '含蓄'],
+    source_author: '李商隐',
+    source_work: '锦瑟',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-poetry-011',
+    title: '翻案法·反弹琵琶',
+    category: 'writing-technique',
+    content: '对前人或大众的定论进行反转，翻出新意。如苏轼翻案前人"春色恼人"为"春色恼人不得住"，不写恼人，而写留不住，翻案出独特感受。',
+    technique_tags: ['翻案法', '苏轼', '创新', '逆向思维'],
+    source_author: '苏轼',
+    source_work: '洞仙词',
+    quality_score: 91,
+  },
+  {
+    id: 'wt-poetry-012',
+    title: '通感·红杏枝头春意闹',
+    category: 'writing-technique',
+    content: '将一种感官的感觉移到另一种感官。如宋祁《玉楼春》"红杏枝头春意闹"，将视觉的春意与听觉的"闹"连通，一个"闹"字境界全出。',
+    technique_tags: ['通感', '感官打通', '宋祁', '诗眼'],
+    source_author: '宋祁',
+    source_work: '玉楼春',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-poetry-013',
+    title: '意境·山色有无中',
+    category: 'writing-technique',
+    content: '指诗歌中主观情意与客观景象相融合所创造的具有无穷韵味的艺术境界。王维《汉江临眺》"江流天地外，山色有无中"，以有限写无限，意境开阔。',
+    technique_tags: ['意境', '王维', '诗中有画', '中国诗歌'],
+    source_author: '王维',
+    source_work: '汉江临眺',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-poetry-014',
+    title: '借景抒情·春望',
+    category: 'writing-technique',
+    content: '不直接表达情感，而是通过景物的描写间接抒发情意。如杜甫《春望》"国破山河在，城春草木深"，以破碎山河的景物描写抒发亡国之痛，情景浑然一体。',
+    technique_tags: ['借景抒情', '杜甫', '情景交融', '爱国'],
+    source_author: '杜甫',
+    source_work: '春望',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-poetry-015',
+    title: '互文·秦时明月汉时关',
+    category: 'writing-technique',
+    content: '上下两句文意互相补充、互相渗透。如王昌龄《出塞》"秦时明月汉时关"，秦时与汉时、明月与关隘互相交融，不可分割。',
+    technique_tags: ['互文', '王昌龄', '边塞诗', '修辞'],
+    source_author: '王昌龄',
+    source_work: '出塞',
+    quality_score: 92,
+  },
+
+  // ============================================================
+  // C. 中国现代武侠技法 - 13条
+  // ============================================================
+
+  {
+    id: 'wt-jy-001',
     title: '草蛇灰线·萧峰身世',
     category: 'writing-technique',
     content: '萧峰出场，胸口狼头纹身，仅作点缀。杏子林事件、马夫人揭真相、萧峰认父，三段文字遥相呼应。伏笔跨越全书五十回，回收时读者恍然大悟。',
@@ -281,170 +1073,1044 @@ const chineseModernExamples: ReferenceExample[] = [
     quality_score: 97,
   },
   {
-    id: 'cm-jy-002',
+    id: 'wt-jy-002',
     title: '紧张舒缓交替·六大派围攻光明顶',
     category: 'writing-technique',
     content: '张无忌一人对六大派，战斗正急，忽然周芷若出场喂饭。一筷面条，顿挫有致。而后战斗再起，更加热烈。紧张与舒缓交替，如波峰波谷。',
-    technique_tags: ['紧张舒缓', '节奏控制', '金庸'],
+    technique_tags: ['紧张舒缓', '节奏控制', '金庸', '张弛'],
     source_author: '金庸',
     source_work: '倚天屠龙记',
     quality_score: 94,
   },
   {
-    id: 'cm-gl-001',
+    id: 'wt-jy-003',
+    title: '道具贯穿·九阴真经',
+    category: 'writing-technique',
+    content: '《射雕英雄传》中九阴真经作为全书核心道具，贯穿射雕三部曲，成为武林人士争夺的对象。道具不仅是物质线索，更是江湖纷争的象征符号。',
+    technique_tags: ['道具贯穿', '结构', '金庸', '武侠'],
+    source_author: '金庸',
+    source_work: '射雕英雄传',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-jy-004',
+    title: '镜像人物·萧峰与段誉',
+    category: 'writing-technique',
+    content: '萧峰与段誉同为英雄却命运迥异：萧峰是"求不得"的悲剧，段誉是"得到却失去"的怅惘。镜像人物使主题表达更加深刻。',
+    technique_tags: ['镜像人物', '对照', '金庸', '主题'],
+    source_author: '金庸',
+    source_work: '天龙八部',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-jy-005',
+    title: '历史大事虚实·蒙古西征',
+    category: 'writing-technique',
+    content: '金庸将成吉思汗西征、花剌子模围城等真实历史事件作为小说框架，在历史大关节上实写，在人物命运上虚构，增加小说的厚重感与真实感。',
+    technique_tags: ['历史虚实', '历史小说', '金庸', '历史'],
+    source_author: '金庸',
+    source_work: '射雕英雄传',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-jy-006',
+    title: '武功哲理化·独孤九剑',
+    category: 'writing-technique',
+    content: '独孤九剑的"无招胜有招"实为道家哲学的武学呈现。降龙十八掌的"亢龙有悔"来自《易经》。金庸将哲学思想融入武功体系，使武侠具有文化深度。',
+    technique_tags: ['武功哲理化', '金庸', '道家', '武侠哲学'],
+    source_author: '金庸',
+    source_work: '笑傲江湖',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-gl-001',
     title: '闪电式开局·冷风如刀',
     category: 'writing-technique',
     content: '"冷风如刀，以大地为砧板，视众生为鱼肉。"起笔即入情境，无任何铺垫，直接将读者拽入凛冽氛围。全句无一动词，却动态十足。',
-    technique_tags: ['闪电式开局', '节奏控制', '古龙', '格言体'],
+    technique_tags: ['闪电式开局', '开头', '古龙', '格言体'],
     source_author: '古龙',
     source_work: '多情剑客无情剑',
     quality_score: 96,
   },
   {
-    id: 'cm-gl-002',
-    title: '悬疑核驱动·谁是青龙会老大',
+    id: 'wt-gl-002',
+    title: '悬疑核驱动·陆小凤',
     category: 'writing-technique',
-    content: '陆小凤系列，以"青龙会老大是谁"为核心悬疑核。每一案，可能人物均疑似青龙会内鬼。碎片化线索逐步拼凑，却始终不得全貌。读者与主角同步推理。',
-    technique_tags: ['悬疑核驱动', '伏笔照应', '古龙'],
+    content: '陆小凤系列以"谁是青龙会老大"为核心悬疑核。每一案，可能人物均疑似青龙会内鬼。碎片化线索逐步拼凑，却始终不得全貌，读者与主角同步推理。',
+    technique_tags: ['悬疑核', '推理', '古龙', '悬疑'],
     source_author: '古龙',
     source_work: '陆小凤传奇',
     quality_score: 93,
   },
-];
-
-// Western Classical Techniques (Homer, Cervantes, Tolstoy, etc.)
-const westernClassicalExamples: ReferenceExample[] = [
   {
-    id: 'wc-hom-001',
-    title: '史诗式倒叙·冥间见闻',
+    id: 'wt-gl-003',
+    title: '短句快节奏·剑已出鞘',
     category: 'writing-technique',
-    content: '奥德修斯冥间见阿基琉斯鬼魂："你虽是死人，却仍照耀如星辰。"通过死者的对话，折射生者的荣耀与悲哀，倒叙手法使时间层次立体化。',
-    technique_tags: ['倒叙', '史诗', '荷马'],
-    source_author: '荷马',
-    source_work: '奥德赛',
+    content: '古龙式短句："剑已出鞘。血还未冷。"以短句为主，形成快速利落的叙事节奏，符合现代读者对速度感的追求，也创造了独特的武侠美学。',
+    technique_tags: ['短句节奏', '古龙', '简洁', '速度感'],
+    source_author: '古龙',
+    source_work: '多情剑客无情剑',
+    quality_score: 91,
+  },
+  {
+    id: 'wt-gl-004',
+    title: '留白推理·楚留香真相揭露',
+    category: 'writing-technique',
+    content: '楚留香系列在结尾时才揭示真相，但真相的揭示过程本身就是对读者智力的尊重。不完全揭示，留下空白让读者参与推理，是古龙的高明之处。',
+    technique_tags: ['留白推理', '古龙', '悬疑', '开放式结局'],
+    source_author: '古龙',
+    source_work: '楚留香传奇',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-gl-005',
+    title: '浪子意象·李寻欢',
+    category: 'writing-technique',
+    content: '李寻欢是古龙浪子形象的代表：武功高强、内心孤独、游戏人间却有坚定底线。浪子不是叛逆者，而是看透了却仍然在世的孤独者。',
+    technique_tags: ['浪子意象', '古龙', '人物塑造', '孤独'],
+    source_author: '古龙',
+    source_work: '多情剑客无情剑',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-liang-001',
+    title: '诗词入武·天山剑法',
+    category: 'writing-technique',
+    content: '梁羽生将诗词意境融入武功描写，天山剑法以诗词为根基，每招每式皆有诗意。如"吹笛引凤"、"平沙落雁"，武功即诗境，文人武侠。',
+    technique_tags: ['诗词入武', '梁羽生', '雅致', '武侠'],
+    source_author: '梁羽生',
+    source_work: '七剑下天山',
+    quality_score: 89,
+  },
+  {
+    id: 'wt-liang-002',
+    title: '正邪分明·武林阵营',
+    category: 'writing-technique',
+    content: '梁羽生保持鲜明的正邪二元对立阵营，在此基础上写出人性的复杂与阵营内部的分化。如凌未风既属正派又有复杂过去，使人物具有纵深感。',
+    technique_tags: ['正邪阵营', '梁羽生', '武侠结构', '人物'],
+    source_author: '梁羽生',
+    source_work: '云海玉弓缘',
+    quality_score: 86,
+  },
+
+  // ============================================================
+  // D. 中国现代小说技法 - 14条
+  // ============================================================
+
+  {
+    id: 'wt-luxun-001',
+    title: '白描·孔乙己排出大钱',
+    category: 'writing-technique',
+    content: '用最简练的笔墨，不加烘托渲染，勾勒出鲜明的人物形象。如写孔乙己"排出九文大钱"，一个"排"字胜过千言万语的描写，见其炫耀与穷酸。',
+    technique_tags: ['白描', '鲁迅', '细节', '人物描写'],
+    source_author: '鲁迅',
+    source_work: '孔乙己',
     quality_score: 95,
   },
   {
-    id: 'wc-cer-001',
-    title: '元叙事·堂吉诃德与读者',
+    id: 'wt-luxun-002',
+    title: '讽刺·阿Q精神胜利法',
     category: 'writing-technique',
-    content: '堂吉诃德阅读大量骑士小说后出发冒险。作者多次插入"读者诸君"的直接呼唤，打破第四堵墙，使读者参与叙事建构。',
-    technique_tags: ['元叙事', '元小说', '塞万提斯'],
+    content: '以讥刺嘲笑的笔调描写社会病态。如阿Q的"精神胜利法"——"我先前比你阔多了"，笑中带泪，笔锋如刀，鲁迅将民族劣根性写到了极致。',
+    technique_tags: ['讽刺', '鲁迅', '精神胜利法', '国民性'],
+    source_author: '鲁迅',
+    source_work: '阿Q正传',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-luxun-003',
+    title: '杂文笔法入小说·狂人日记',
+    category: 'writing-technique',
+    content: '将杂文的讽刺力道与批判精神融入小说创作。《狂人日记》的日记体具有强烈的论辩性，在叙事中隐含论辩，文学与批判合而为一。',
+    technique_tags: ['杂文笔法', '鲁迅', '狂人日记', '批判'],
+    source_author: '鲁迅',
+    source_work: '狂人日记',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-luxun-004',
+    title: '叙事视角切换·祝福',
+    category: 'writing-technique',
+    content: '《祝福》由知识分子的"我"来叙述，却以祥林嫂的悲剧为核心，形成视角与主题的微妙张力。叙事者的无能为力与祥林嫂的命运悲剧形成深刻反讽。',
+    technique_tags: ['视角切换', '鲁迅', '叙事距离', '讽刺'],
+    source_author: '鲁迅',
+    source_work: '祝福',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-shen-001',
+    title: '田园牧歌·边城诗意',
+    category: 'writing-technique',
+    content: '以抒情诗般的笔调描写湘西乡村的田园生活，构建与都市文明相对立的自然纯朴的牧歌世界。沈从文的田园牧歌是对现代性的温柔抵抗。',
+    technique_tags: ['田园牧歌', '沈从文', '抒情', '边城'],
+    source_author: '沈从文',
+    source_work: '边城',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-shen-002',
+    title: '风情描写·湘西民俗',
+    category: 'writing-technique',
+    content: '以细腻的笔触描写湘西特有的风土人情，端午赛龙舟、中秋赶坳等民俗，使小说具有浓郁的地方色彩与民俗学价值。风情即人物。',
+    technique_tags: ['风情描写', '沈从文', '民俗', '地方色彩'],
+    source_author: '沈从文',
+    source_work: '边城',
+    quality_score: 91,
+  },
+  {
+    id: 'wt-zhang-001',
+    title: '参差对照·倾城之恋',
+    category: 'writing-technique',
+    content: '不用强烈的对比而用参差的对照，写出人物复杂的灰色地带。如《倾城之恋》中白流苏与范柳原的感情，既有算计也有真情，不作简单的道德判断。',
+    technique_tags: ['参差对照', '张爱玲', '爱情', '复杂人性'],
+    source_author: '张爱玲',
+    source_work: '倾城之恋',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-zhang-002',
+    title: '意象繁复·金锁记月亮',
+    category: 'writing-technique',
+    content: '《金锁记》反复出现月亮、镜子等意象，构成完整的象征网络。如"三十年前的月亮"与"三十年后的月亮"，时间的对照与意象的重复，象征着曹七巧被毁灭的一生。',
+    technique_tags: ['意象繁复', '张爱玲', '象征', '月亮'],
+    source_author: '张爱玲',
+    source_work: '金锁记',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-zhang-003',
+    title: '市民生活史诗·半生缘',
+    category: 'writing-technique',
+    content: '将个人命运置于宏大历史背景中，但着眼点始终是饮食男女的日常细节。如《半生缘》以世钧与曼桢的错过，写尽大时代里小人物的无力感。',
+    technique_tags: ['市民生活', '张爱玲', '日常生活', '历史'],
+    source_author: '张爱玲',
+    source_work: '半生缘',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-moyan-001',
+    title: '魔幻现实主义本土化·红高粱',
+    category: 'writing-technique',
+    content: '将西方魔幻现实主义技法与高密东北乡的民间传说、鬼神信仰相结合。如"我爷爷"与"我奶奶"的叙述视角，以及高粱的灵性描写，创造出独特的魔幻现实主义东方版本。',
+    technique_tags: ['魔幻现实主义', '莫言', '红高粱', '本土化'],
+    source_author: '莫言',
+    source_work: '红高粱家族',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-moyan-002',
+    title: '感官轰炸·丰乳肥臀',
+    category: 'writing-technique',
+    content: '调动一切感官——视觉、听觉、嗅觉、味觉、触觉——进行密集的描写。如上官鲁地生产场面的描写，感官的全部调动创造出强烈而原始的生命体验。',
+    technique_tags: ['感官轰炸', '莫言', '身体', '原始'],
+    source_author: '莫言',
+    source_work: '丰乳肥臀',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-moyan-003',
+    title: '民间话语·生死疲劳',
+    category: 'writing-technique',
+    content: '大量采用民间俗语、俚语、脏话，引入说书、唱词等民间文艺形式。《生死疲劳》以动物视角叙事，民间话语的运用使小说具有强烈的生命力和泥土气息。',
+    technique_tags: ['民间话语', '莫言', '说书', '口语'],
+    source_author: '莫言',
+    source_work: '生死疲劳',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-moyan-004',
+    title: '家族史诗·生死疲劳轮回',
+    category: 'writing-technique',
+    content: '以西门闹一家六代的轮回，展现中国农村的历史变迁与苦难。如驴折腾、牛犟劲、猪快活、狗精神、猴结束，人与动物的轮回对应时代的变迁。',
+    technique_tags: ['家族史诗', '莫言', '轮回', '历史'],
+    source_author: '莫言',
+    source_work: '生死疲劳',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-ba-jin-001',
+    title: '激流三部曲·青春叙事',
+    category: 'writing-technique',
+    content: '巴金以《家》《春》《秋》叙述了一个封建家族的衰落与青年的觉醒。如觉慧的离家出走，"我是我自己的，谁也管不了我"，喊出了五四一代的心声。',
+    technique_tags: ['青春叙事', '巴金', '觉醒', '反封建'],
+    source_author: '巴金',
+    source_work: '家',
+    quality_score: 90,
+  },
+
+  // ============================================================
+  // E. 西方古典技法 (Aristotle, Homer, etc.) - 12条
+  // ============================================================
+
+  {
+    id: 'wt-arist-001',
+    title: 'Catharsis 净化·悲剧的情感释放',
+    category: 'writing-technique',
+    content: '亚里士多德认为悲剧通过怜悯与恐惧使观众情感得到净化与释放。如《俄狄浦斯王》，观众与主人公一同经历从无知到认知的痛苦过程，情感得以净化。',
+    technique_tags: ['净化', '亚里士多德', '悲剧', '诗学'],
+    source_author: '亚里士多德',
+    source_work: '诗学',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-arist-002',
+    title: 'Mimesis 摹仿·文学即再现',
+    category: 'writing-technique',
+    content: '文学对现实的再现与模拟，一切叙事皆为对行动的摹仿。亚里士多德认为史诗与悲剧都是对行动的摹仿，只是媒介不同。',
+    technique_tags: ['摹仿', '亚里士多德', '再现', '诗学'],
+    source_author: '亚里士多德',
+    source_work: '诗学',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-arist-003',
+    title: 'Hamartia 致命缺陷·悲剧根由',
+    category: 'writing-technique',
+    content: '悲剧主角因自身性格缺陷或判断失误而走向毁灭。俄狄浦斯的hamartia是"不知"，他不知道眼前的人是自己的父亲，最终酿成弑父娶母的悲剧。',
+    technique_tags: ['致命缺陷', '亚里士多德', '悲剧人物', '俄狄浦斯'],
+    source_author: '亚里士多德',
+    source_work: '诗学',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-arist-004',
+    title: 'Peripeteia 命运逆转·从顺境到绝境',
+    category: 'writing-technique',
+    content: '情节中人物命运从顺境急转直下。俄狄浦斯从底比斯王的尊荣跌入罪人的深渊，是Peripeteia的典范，命运逆转令观众震撼。',
+    technique_tags: ['命运逆转', '亚里士多德', '情节', '悲剧'],
+    source_author: '亚里士多德',
+    source_work: '诗学',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-arist-005',
+    title: 'Anagnorisis 认知时刻·发现即高潮',
+    category: 'writing-technique',
+    content: '主角从无知到知的关键转折，常与命运逆转同时发生。俄狄浦斯"发现"自己弑父娶母的那一刻，是古希腊悲剧最震撼的认知时刻。',
+    technique_tags: ['认知时刻', '亚里士多德', '发现', '悲剧'],
+    source_author: '亚里士多德',
+    source_work: '诗学',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-homer-001',
+    title: 'In Medias Res 中切入·奥德赛开篇',
+    category: 'writing-technique',
+    content: '叙事从故事进行中途切入，而非从头讲起。荷马《奥德赛》开篇："歌唱吧女神，歌唱裴琉斯之子......他从特洛伊归家，二十年的流浪与经历。"起点即中点。',
+    technique_tags: ['中切入', '荷马', '史诗', '叙事'],
+    source_author: '荷马',
+    source_work: '奥德赛',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-homer-002',
+    title: 'Epic Simile 史诗明喻·特洛伊城墙',
+    category: 'writing-technique',
+    content: '将英雄行为与自然景象作长篇幅对比的宏大比喻。如描写阿基琉斯追击赫克托尔，跨越数行，如同自然界最壮观的力量，是史诗宏大性的语言标志。',
+    technique_tags: ['史诗明喻', '荷马', '宏大比喻', '伊利亚特'],
+    source_author: '荷马',
+    source_work: '伊利亚特',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-homer-003',
+    title: 'Invocation of the Muse 呼唤缪斯·史诗惯例',
+    category: 'writing-technique',
+    content: '史诗开篇诗人请求缪斯女神赐予灵感，建立神圣叙事权威。荷马以此惯例为叙事设定超人的视野与知识范围，使叙述具有神圣的合法性。',
+    technique_tags: ['呼唤缪斯', '荷马', '史诗惯例', '叙事权威'],
+    source_author: '荷马',
+    source_work: '奥德赛',
+    quality_score: 88,
+  },
+  {
+    id: 'wt-medieval-001',
+    title: 'Allegory 寓言·神曲的道德层次',
+    category: 'writing-technique',
+    content: '叙事表面为字面故事，深层承载道德、宗教或政治意义的双重结构。但丁《神曲》的字面意义是流浪故事，深层意义是灵魂的救赎之旅。',
+    technique_tags: ['寓言', '但丁', '双重意义', '神曲'],
+    source_author: '但丁',
+    source_work: '神曲',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-medieval-002',
+    title: 'Frame Narrative 框架叙事·十日谈',
+    category: 'writing-technique',
+    content: '以外层故事为容器，内嵌多个独立故事。薄伽丘《十日谈》以黑死病背景下的十个讲故事者为框架，赋予叙事合理性与社会批评的合法性。',
+    technique_tags: ['框架叙事', '薄伽丘', '十日谈', '故事嵌套'],
+    source_author: '薄伽丘',
+    source_work: '十日谈',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-medieval-003',
+    title: 'Ekphrasis 图象描写·骑士盾牌',
+    category: 'writing-technique',
+    content: '对艺术品、战盾或挂毯的细腻文字描绘，使视觉意象转化为叙事时间。中世纪骑士文学中，盾牌上的图案往往是一个微型叙事，包含骑士的来历与命运。',
+    technique_tags: ['图象描写', '中世纪', '骑士文学', '视觉'],
+    source_author: '佚名',
+    source_work: '中世纪骑士传奇',
+    quality_score: 86,
+  },
+  {
+    id: 'wt-medieval-004',
+    title: 'Estates Satire 等级讽刺·坎特伯雷故事',
+    category: 'writing-technique',
+    content: '通过描绘不同社会阶层人物的道德败坏，系统讽刺中世纪社会秩序。乔叟的《坎特伯雷故事集》中各类朝圣者的故事构成了英国社会的全景讽刺。',
+    technique_tags: ['等级讽刺', '乔叟', '社会批评', '讽刺'],
+    source_author: '乔叟',
+    source_work: '坎特伯雷故事集',
+    quality_score: 91,
+  },
+
+  // ============================================================
+  // F. 西方文艺复兴技法 (Shakespeare, Cervantes) - 12条
+  // ============================================================
+
+  {
+    id: 'wt-shakes-001',
+    title: 'Soliloquy 独白·哈姆雷特思考存在',
+    category: 'writing-technique',
+    content: '"活着还是不活，这是一个问题。"——莎士比亚的独白技法使观众直接进入角色的意识层，与角色一同思考存在、死亡与行动的终极问题。',
+    technique_tags: ['独白', '莎士比亚', '哈姆雷特', '存在主义'],
+    source_author: '莎士比亚',
+    source_work: '哈姆雷特',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-shakes-002',
+    title: 'Dramatic Irony 戏剧反讽·麦克白的观众优势',
+    category: 'writing-technique',
+    content: '观众掌握角色所不知的信息，形成认知落差。麦克白在舞台上杀死邓肯时，观众比剧中任何人都更清楚这意味着什么，恐惧与悬念由此产生。',
+    technique_tags: ['戏剧反讽', '莎士比亚', '麦克白', '认知落差'],
+    source_author: '莎士比亚',
+    source_work: '麦克白',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-shakes-003',
+    title: 'Foil Character 对照人物·霍拉旭与哈姆雷特',
+    category: 'writing-technique',
+    content: '通过性格鲜明对立的配角，突出主角的核心特质。霍拉旭的冷静理性与哈姆雷特的犹豫耽思相互对照，使哈姆雷特的忧郁更加突出。',
+    technique_tags: ['对照人物', '莎士比亚', '人物塑造', '哈姆雷特'],
+    source_author: '莎士比亚',
+    source_work: '哈姆雷特',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-shakes-004',
+    title: 'Play within a Play 戏中戏·哈姆雷特的陷阱',
+    category: 'writing-technique',
+    content: '在戏剧内部嵌套表演，既推进情节，又制造元叙事层次与反讽效果。哈姆雷特用"捕鼠器"戏中戏试探叔叔的谋杀罪行，戏与真在此合而为一。',
+    technique_tags: ['戏中戏', '莎士比亚', '元叙事', '反讽'],
+    source_author: '莎士比亚',
+    source_work: '哈姆雷特',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-shakes-005',
+    title: 'Tragic Hero 悲剧英雄·李尔王的疯狂',
+    category: 'writing-technique',
+    content: '兼具伟大与缺陷的主角，因傲慢（Hubris）走向毁灭。李尔王因刚愎自用而流落荒野，疯狂中发现真理，是莎士比亚笔下最深刻的悲剧英雄形象。',
+    technique_tags: ['悲剧英雄', '莎士比亚', '李尔王', '疯狂'],
+    source_author: '莎士比亚',
+    source_work: '李尔王',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-shakes-006',
+    title: 'Aside 旁白·窃窃私语',
+    category: 'writing-technique',
+    content: '角色低声向观众说出台词，其他角色假定听不见，制造戏剧共谋与反讽效果。如莎士比亚诸剧中，旁白使角色与观众建立秘密的联系。',
+    technique_tags: ['旁白', '莎士比亚', '戏剧技法', '共谋'],
+    source_author: '莎士比亚',
+    source_work: '莎士比亚诸剧',
+    quality_score: 89,
+  },
+  {
+    id: 'wt-shakes-007',
+    title: 'Blank Verse 无韵诗·莎剧节奏',
+    category: 'writing-technique',
+    content: '不押韵的抑扬格五步格诗行，给叙事以宏大节奏感，又保留口语的弹性。莎士比亚的大部分剧作以无韵诗写成，是声音形式与内容的完美统一。',
+    technique_tags: ['无韵诗', '莎士比亚', '节奏', '声音'],
+    source_author: '莎士比亚',
+    source_work: '莎士比亚全集',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-cervantes-001',
+    title: 'Parody 戏拟·堂吉诃德的骑士解构',
+    category: 'writing-technique',
+    content: '通过夸张模仿骑士传奇，揭示文学幻象与现实的根本裂缝。塞万提斯以堂吉诃德的游侠梦想系统性地解构骑士文学，同时又哀叹理想的消亡。',
+    technique_tags: ['戏拟', '塞万提斯', '堂吉诃德', '反讽'],
+    source_author: '塞万提斯',
+    source_work: '堂吉诃德',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-cervantes-002',
+    title: 'Quixotic Idealism 堂吉诃德式理想主义',
+    category: 'writing-technique',
+    content: '人物以过时的理想诠释现实，其幻觉与现实的冲突构成喜剧与悲剧的双重源泉。堂吉诃德的悲剧在于他太真诚地相信幻想，是理想主义者的孤独画像。',
+    technique_tags: ['理想主义', '塞万提斯', '堂吉诃德', '幻觉'],
+    source_author: '塞万提斯',
+    source_work: '堂吉诃德',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-cervantes-003',
+    title: 'Metafiction 元小说·堂吉诃德与读者',
+    category: 'writing-technique',
+    content: '作者多次插入"读者诸君"的直接呼唤，打破第四堵墙，使读者参与叙事建构。《堂吉诃德》的叙述者与角色之间的互动本身成为一层叙事。',
+    technique_tags: ['元小说', '塞万提斯', '读者参与', '第四堵墙'],
     source_author: '塞万提斯',
     source_work: '堂吉诃德',
     quality_score: 94,
   },
   {
-    id: 'wc-tol-001',
-    title: '心理时间·娜塔莎的夜晚',
+    id: 'wt-milton-001',
+    title: 'Epic Invocation 史诗呼唤·失乐园开篇',
     category: 'writing-technique',
-    content: '娜塔莎等待安德来的一夜，作者将一小时的心理活动拉展为数十页。现实时间与心理时间错位，外部动作极少，内心波澜壮阔。',
-    technique_tags: ['心理时间', '意识流先声', '托尔斯泰'],
+    content: '弥尔顿用基督教神学替换希腊神话，改造古典史诗惯例。"我要歌唱人类如何丧失乐园"，弥尔顿的开篇呼唤确立了基督教史诗的新范式。',
+    technique_tags: ['史诗', '弥尔顿', '失乐园', '基督教'],
+    source_author: '弥尔顿',
+    source_work: '失乐园',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-marlowe-001',
+    title: ' Tamburlaine 征服者独白·权力的语言',
+    category: 'writing-technique',
+    content: '马洛以气势磅礴的无韵诗独白塑造征服者形象。帖木儿的征服演说将政治权力写成一种审美的、几乎是诗性的行为，是权力话语的典范。',
+    technique_tags: ['独白', '马洛', '权力', '无韵诗'],
+    source_author: '马洛',
+    source_work: '帖木儿大帝',
+    quality_score: 88,
+  },
+
+  // ============================================================
+  // G. 19世纪现实主义技法 (Austen, Dickens, Tolstoy, etc.) - 12条
+  // ============================================================
+
+  {
+    id: 'wt-austen-001',
+    title: 'Free Indirect Discourse 自由间接引语·爱玛的内心',
+    category: 'writing-technique',
+    content: '第三人称叙述无缝融入人物意识，无引号，无"她想"，读者同时听见叙述者与人物。奥斯汀在《爱玛》中将此技法发展到完美，是英国文学的巅峰。',
+    technique_tags: ['自由间接引语', '奥斯汀', '意识', '第三人称'],
+    source_author: '奥斯汀',
+    source_work: '爱玛',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-austen-002',
+    title: 'Irony of Manners 礼俗反讽·傲慢与偏见',
+    category: 'writing-technique',
+    content: '以风趣的社交观察揭示礼貌外表下的虚伪与阶级势利。奥斯汀在《傲慢与偏见》的开场中写道："凡有财产的单身汉，都需要一位太太"，反讽轻盈而锐利。',
+    technique_tags: ['礼俗反讽', '奥斯汀', '社会批评', '讽刺'],
+    source_author: '奥斯汀',
+    source_work: '傲慢与偏见',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-dickens-001',
+    title: 'Leitmotif 主导动机·荒凉山庄的密语',
+    category: 'writing-technique',
+    content: '反复出现的意象、语词或场景，累积象征意义。狄更斯在《荒凉山庄》中以"密语"为核心动机，贯穿全书，构成小说的情感基调与神秘核心。',
+    technique_tags: ['主导动机', '狄更斯', '象征', '主题'],
+    source_author: '狄更斯',
+    source_work: '荒凉山庄',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-dickens-002',
+    title: 'Social Panorama 社会全景·双城记',
+    category: 'writing-technique',
+    content: '通过庞大人物群与交错情节，再现一个时代的完整社会横截面。法国大革命的前台与后台、贵族与平民，在狄更斯笔下构成震撼的历史全景。',
+    technique_tags: ['社会全景', '狄更斯', '历史', '革命'],
+    source_author: '狄更斯',
+    source_work: '双城记',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-tolstoy-001',
+    title: 'Psychological Realism 心理现实主义·安娜的内心',
+    category: 'writing-technique',
+    content: '以细腻连续的心理描写追踪人物意识的实时流动，优先于外部行动。托尔斯泰写安娜在火车前的内心风暴，是心理描写的不朽典范。',
+    technique_tags: ['心理现实主义', '托尔斯泰', '内心', '安娜'],
     source_author: '托尔斯泰',
-    source_work: '战争与和平',
+    source_work: '安娜·卡列尼娜',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-tolstoy-002',
+    title: 'Subplot as Counterpoint 副线对位·列文与安娜',
+    category: 'writing-technique',
+    content: '以列文线与安娜线构成价值对照，两条故事线互为注脚。安娜追求激情之爱走向毁灭，列文追求精神信仰找到答案，两线对位构成小说的道德辩证。',
+    technique_tags: ['副线对位', '托尔斯泰', '双线叙事', '道德'],
+    source_author: '托尔斯泰',
+    source_work: '安娜·卡列尼娜',
     quality_score: 96,
   },
-];
-
-// Western Modern Techniques (Joyce, Hemingway, Faulkner, etc.)
-const westernModernExamples: ReferenceExample[] = [
   {
-    id: 'wm-joy-001',
-    title: '意识流·莫妮娅的内心独白',
+    id: 'wt-flaubert-001',
+    title: 'Realist Detail 现实主义细节·包法利夫人的一顿晚餐',
     category: 'writing-technique',
-    content: '莫妮娅在海边："慢慢地把水弄咸……他走后的所有日子都是这样开始的……"内心独白自由飘浮，无标点束缚，思维本身成为叙事客体。',
-    technique_tags: ['意识流', '内心独白', '乔伊斯'],
+    content: '以精准、不带判断的物质细节描绘日常生活。福楼拜描写一顿晚餐时，每个盘子、每道菜、每件餐具都以医学解剖般的精确呈现，追求"客观"的科学叙事幻觉。',
+    technique_tags: ['现实主义细节', '福楼拜', '客观', '包法利夫人'],
+    source_author: '福楼拜',
+    source_work: '包法利夫人',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-flaubert-002',
+    title: 'Flaubertian Style 风雅与庸俗的并置',
+    category: 'writing-technique',
+    content: '自由间接引语的极致运用：叙述者隐身，爱玛的庸俗与叙述者的讽刺悄然并置。如爱玛读浪漫小说时的内心独白与叙述者的语调之间的微妙距离，是福楼拜的标志。',
+    technique_tags: ['自由间接引语', '福楼拜', '讽刺', '并置'],
+    source_author: '福楼拜',
+    source_work: '包法利夫人',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-hawthorn-001',
+    title: 'Symbolism 象征·红字A字',
+    category: 'writing-technique',
+    content: '具体事物承载抽象道德或心理含义，意义在文本重复出现中逐渐浓缩。海丝特·白兰胸前的红字"A"，从Adultery（通奸）到Able（能干）到Angel（天使），意义在故事进程中不断转化。',
+    technique_tags: ['象征', '霍桑', '红字', '道德'],
+    source_author: '霍桑',
+    source_work: '红字',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-hardy-001',
+    title: 'Pathetic Fallacy 感情谬误·还乡的荒原',
+    category: 'writing-technique',
+    content: '自然景物被赋予与人物情感对应的色彩。哈代在《还乡》中将爱敦荒原写成有生命的道德景观：荒原的冷峻与人物的无情悲剧相互映照。',
+    technique_tags: ['感情谬误', '哈代', '自然描写', '象征'],
+    source_author: '哈代',
+    source_work: '还乡',
+    quality_score: 91,
+  },
+  {
+    id: 'wt-dostoevsky-001',
+    title: 'Grand Inquisitor 大法官对话·信仰与自由的辩难',
+    category: 'writing-technique',
+    content: '《卡拉马佐夫兄弟》中大法官与基督的对话是文学史上最深刻的哲学论辩之一。大法官指责基督高估了人类自由的重量，是知识分子小说的极致。',
+    technique_tags: ['哲学对话', '陀思妥耶夫斯基', '信仰', '自由'],
+    source_author: '陀思妥耶夫斯基',
+    source_work: '卡拉马佐夫兄弟',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-dostoevsky-002',
+    title: 'Double 双重人格·卡拉马佐夫式的精神分裂',
+    category: 'writing-technique',
+    content: '以两个人格或两个对立面来呈现人物的精神分裂。如德米特里与斯梅尔佳科夫是父亲的两个影子，卡拉马佐夫一家每个人都是善与恶的战场。',
+    technique_tags: ['双重人格', '陀思妥耶夫斯基', '分裂', '卡拉马佐夫'],
+    source_author: '陀思妥耶夫斯基',
+    source_work: '卡拉马佐夫兄弟',
+    quality_score: 96,
+  },
+
+  // ============================================================
+  // H. 现代主义技法 (Joyce, Woolf, Kafka, Proust) - 12条
+  // ============================================================
+
+  {
+    id: 'wt-joyce-001',
+    title: 'Stream of Consciousness 意识流·莫妮亚的内心',
+    category: 'writing-technique',
+    content: '直接呈现角色未经整理的思想流动，打破语法与逻辑的线性约束。乔伊斯在《尤利西斯》的"米莱"篇中，以无标点的内心独白呈现意识的最原始状态。',
+    technique_tags: ['意识流', '乔伊斯', '内心', '尤利西斯'],
+    source_author: '乔伊斯',
+    source_work: '尤利西斯',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-joyce-002',
+    title: 'Epiphany 顿悟时刻·都柏林人的灵光',
+    category: 'writing-technique',
+    content: '平凡瞬间中突然涌现的深刻领悟，改变角色对自身或世界的认知。乔伊斯在《都柏林人》诸篇中，以细微的日常时刻承载最大的灵性重量。',
+    technique_tags: ['顿悟', '乔伊斯', '日常', '灵光'],
+    source_author: '乔伊斯',
+    source_work: '都柏林人',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-joyce-003',
+    title: 'Mythical Method 神话方法·尤利西斯对照奥德修斯',
+    category: 'writing-technique',
+    content: '将现代日常生活叠加于古典神话结构之上，赋予现代人普遍的史诗意义。乔伊斯以奥德修斯的十年流浪对照布卢姆的一天，表现现代人的精神流亡。',
+    technique_tags: ['神话方法', '乔伊斯', '互文', '尤利西斯'],
     source_author: '乔伊斯',
     source_work: '尤利西斯',
     quality_score: 97,
   },
   {
-    id: 'wm-hem-001',
-    title: '冰山原则·乞力马扎罗的雪',
+    id: 'wt-woolf-001',
+    title: 'Multiple Focalization 多重聚焦·达洛维夫人的一天',
     category: 'writing-technique',
-    content: '哈里死于乞力马扎罗山巅。小说中从未直接写他如何死亡，只写他的意识飘向山巅。文字是露出水面的冰山，水下是未言的生死主题。',
-    technique_tags: ['冰山原则', '简洁', '海明威'],
-    source_author: '海明威',
-    source_work: '乞力马扎罗的雪',
-    quality_score: 96,
-  },
-  {
-    id: 'wm-fau-001',
-    title: '多视角叙事·喧哗与骚动',
-    category: 'writing-technique',
-    content: '班杰明的意识、昆丁的意识、凯蒂的意识，三个视角讲述同一家庭的分崩离析。视角切换如棱镜折射，同一事件呈现不同色泽。',
-    technique_tags: ['多视角', '意识流', '福克纳'],
-    source_author: '福克纳',
-    source_work: '喧哗与骚动',
-    quality_score: 95,
-  },
-];
-
-// Narrative Framework Examples
-const narrativeFrameworkExamples: ReferenceExample[] = [
-  {
-    id: 'nf-001',
-    title: '红楼梦·家族兴衰结构',
-    category: 'narrative-framework',
-    content: '以贾府兴衰为经，以宝黛爱情为纬。家族命运与个人命运交织，最终繁华落尽，落了片白茫茫大地真干净。结构宏大而统一。',
-    technique_tags: ['家族叙事', '兴衰结构', '网状结构'],
-    source_author: '曹雪芹',
-    source_work: '红楼梦',
-    quality_score: 98,
-  },
-  {
-    id: 'nf-002',
-    title: '天龙八部·三线并行交织',
-    category: 'narrative-framework',
-    content: '萧峰线、段誉线、虚竹线，三条人物线独立发展，后交织于少林寺大会。三线如辫子，最终合拢成一。',
-    technique_tags: ['多线并行', '人物交织', '金庸'],
-    source_author: '金庸',
-    source_work: '天龙八部',
-    quality_score: 95,
-  },
-  {
-    id: 'nf-003',
-    title: '俄狄浦斯王·发现与逆转',
-    category: 'narrative-framework',
-    content: '信使带来真相，发现即逆转。俄狄浦斯"发现"自己弑父娶母的那一刻，即命运逆转的高潮。亚里士多德称之为"发现即逆转"。',
-    technique_tags: ['发现与逆转', '悲剧结构', '索福克勒斯'],
-    source_author: '索福克勒斯',
-    source_work: '俄狄浦斯王',
+    content: '同一事件从多个角色视角呈现，拒绝单一权威视点。如《达洛维夫人》以克拉丽莎与塞普蒂默斯的两条意识线交织，真理在视角碰撞中浮现。',
+    technique_tags: ['多重聚焦', '伍尔夫', '多视角', '意识流'],
+    source_author: '伍尔夫',
+    source_work: '达洛维夫人',
     quality_score: 97,
   },
-];
-
-// Visual Lens Examples
-const visualLensExamples: ReferenceExample[] = [
   {
-    id: 'vl-001',
-    title: '金庸·张无忌光明顶之战',
-    category: 'visual-lens',
-    content: '张无忌一人对崆峒派、华山派、昆仑派、正反两仪刀剑。动作描写如绘画：一分为二、二分为四、四分为八，层层递加，视觉丰富如棋盘。',
-    technique_tags: ['动作描写', '武侠动作', '金庸'],
-    source_author: '金庸',
-    source_work: '倚天屠龙记',
+    id: 'wt-woolf-002',
+    title: 'Lyric Novel 抒情小说·海浪的诗性结构',
+    category: 'writing-technique',
+    content: '以诗性语言与意象取代情节驱动。伍尔夫《海浪》的结构近于交响诗，六个人的意识流转如同海浪的起伏，没有传统情节，只有声音与意象。',
+    technique_tags: ['抒情小说', '伍尔夫', '诗性', '结构'],
+    source_author: '伍尔夫',
+    source_work: '海浪',
     quality_score: 94,
   },
   {
-    id: 'vl-002',
-    title: '古龙·兰亭集序意境',
-    category: 'visual-lens',
-    content: '李寻欢与林诗音分别，十年来各自回忆。文字如山水画留白："她只是静静地站在阴影里，像一幅淡墨山水。"意境大于情节。',
-    technique_tags: ['意境描写', '氛围', '古龙'],
-    source_author: '古龙',
-    source_work: '多情剑客无情剑',
+    id: 'wt-proust-001',
+    title: 'Involuntary Memory 非自愿记忆·玛德莱娜蛋糕',
+    category: 'writing-technique',
+    content: '由感官刺激（玛德莱娜蛋糕、茶）的气味触发无意识记忆，比主动回忆更真实丰满。普鲁斯特以此技法探索记忆、时间与自我的本质。',
+    technique_tags: ['非自愿记忆', '普鲁斯特', '记忆', '追寻'],
+    source_author: '普鲁斯特',
+    source_work: '追寻逝水年华',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-kafka-001',
+    title: 'Kafkaesque Absurdism 卡夫卡式荒诞·变形记开头',
+    category: 'writing-technique',
+    content: '以平静克制的语调描述荒诞处境。格里高尔·萨姆沙早晨醒来变成大甲虫——卡夫卡以最平常的语调写最荒诞的事件，制造出最大程度的恐怖。',
+    technique_tags: ['荒诞', '卡夫卡', '变形记', '反讽'],
+    source_author: '卡夫卡',
+    source_work: '变形记',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-kafka-002',
+    title: 'Parable 寓言体·城堡的不可接近',
+    category: 'writing-technique',
+    content: '以寓言的结构处理现代人的生存困境。K永远无法进入城堡——是官僚体制的批判，也是人类存在困境的形而上寓言，寓言的层次无穷无尽。',
+    technique_tags: ['寓言', '卡夫卡', '存在主义', '官僚'],
+    source_author: '卡夫卡',
+    source_work: '城堡',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-conrad-001',
+    title: 'Unreliable Narrator 不可靠叙述者·马洛的视角',
+    category: 'writing-technique',
+    content: '叙述者因偏见、无知或欺骗而扭曲真相，读者须主动辨别叙事的可信度。马洛叙述库尔茨的故事时，他自己的判断力也在接受考验。',
+    technique_tags: ['不可靠叙述者', '康拉德', '黑暗之心', '视角'],
+    source_author: '康拉德',
+    source_work: '黑暗之心',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-mann-001',
+    title: 'Time Dilation 时间伸缩·魔山的时间主观性',
+    category: 'writing-technique',
+    content: '主观时间感知取代客观时钟时间。托马斯·曼的《魔山》中，七年可以写成一章，一天也可以写成一章，时间的长度取决于意识的深度。',
+    technique_tags: ['时间伸缩', '托马斯·曼', '主观时间', '魔山'],
+    source_author: '托马斯·曼',
+    source_work: '魔山',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-woolf-003',
+    title: 'Objective Correlative 客观对应物·花开花落',
+    category: 'writing-technique',
+    content: '以一串事物、场景或事件来表达某种特定的情感。如《达洛维夫人》以花的开放与内心的精神危机对应，外在世界成为内心世界的"客观对应物"。',
+    technique_tags: ['客观对应物', '伍尔夫', '意象', '象征'],
+    source_author: '伍尔夫',
+    source_work: '达洛维夫人',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-joyce-004',
+    title: 'Interior Monologue 内心独白·莫莉的最后独白',
+    category: 'writing-technique',
+    content: '以第一人称直接呈现意识内容，无标点，无外部框架，极度沉浸于内部声音。《尤利西斯》的结尾莫莉的独白是文学史上最长的无标点意识流段落。',
+    technique_tags: ['内心独白', '乔伊斯', '无标点', '意识流'],
+    source_author: '乔伊斯',
+    source_work: '尤利西斯',
+    quality_score: 97,
+  },
+
+  // ============================================================
+  // I. 20世纪美国文学技法 (Hemingway, Faulkner, Fitzgerald) - 10条
+  // ============================================================
+
+  {
+    id: 'wt-hemingway-001',
+    title: 'Iceberg Theory 冰山理论·老人与海',
+    category: 'writing-technique',
+    content: '叙事表面简洁，七分之六的情感与意义潜藏于水下。老人与海的故事表面是捕鱼，内核是人与命运的抗争、失败与尊严，"可摧毁，但不能被击败"。',
+    technique_tags: ['冰山理论', '海明威', '简洁', '象征'],
+    source_author: '海明威',
+    source_work: '老人与海',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-hemingway-002',
+    title: 'Understatement 轻描淡写·战地钟声的结尾',
+    category: 'writing-technique',
+    content: '刻意用平淡语言描述强烈事件，情感克制反而放大冲击力。如《战地钟声》结尾罗伯特·乔丹说"我不想离开"，以最简单的话承载最大的情感。',
+    technique_tags: ['轻描淡写', '海明威', '克制', '情感'],
+    source_author: '海明威',
+    source_work: '战地钟声',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-hemingway-003',
+    title: 'Hard-Boiled Dialogue 硬派对话·长眠不醒',
+    category: 'writing-technique',
+    content: '以干脆、讽刺、充满行话的口语对话揭示人物。钱德勒笔下的马洛用硬派对话创造了美国的都市神话，对话本身即人物。',
+    technique_tags: ['硬派对话', '钱德勒', '黑色小说', '口语'],
+    source_author: '钱德勒',
+    source_work: '长眠不醒',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-faulkner-001',
+    title: 'Southern Gothic 南方哥特·喧嚣与骚动',
+    category: 'writing-technique',
+    content: '腐朽家族、怪诞人物与南方历史罪孽交织。福克纳的约克纳帕塔法县以哥特式手法处理美国南方的奴隶制遗产，是美国文学中最深刻的道德景观。',
+    technique_tags: ['南方哥特', '福克纳', '美国南方', '历史'],
+    source_author: '福克纳',
+    source_work: '喧嚣与骚动',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-faulkner-002',
+    title: 'Non-linear Chronology 非线性时序·押沙龙的结构',
+    category: 'writing-technique',
+    content: '打乱时间顺序，以人物记忆的碎片化方式拼贴故事。福克纳的叙事时序即他笔下人物精神状态的映射，形式即内容。',
+    technique_tags: ['非线性时序', '福克纳', '记忆', '碎片叙事'],
+    source_author: '福克纳',
+    source_work: '押沙龙，押沙龙！',
     quality_score: 95,
   },
   {
-    id: 'vl-003',
-    title: '海明威·斗牛场面',
-    category: 'visual-lens',
-    content: '"红布在公牛面前抖动，他蹄子刨地，蹄子下的沙土飞溅如血。"动作精准如解剖，感官细节密集，读者如在现场。',
-    technique_tags: ['动作描写', '感官细节', '海明威'],
-    source_author: '海明威',
-    source_work: '永别了武器',
+    id: 'wt-fitzgerald-001',
+    title: 'Green Light Symbolism 绿灯象征·美国梦的彼岸',
+    category: 'writing-technique',
+    content: '单一意象承载小说的全部主题重量。盖茨比伸向的绿灯是财富、爱情与梦想的终极象征，是美国梦的隐喻，贯穿小说首尾，意义不断累积。',
+    technique_tags: ['象征', '菲茨杰拉德', '美国梦', '绿灯'],
+    source_author: '菲茨杰拉德',
+    source_work: '了不起的盖茨比',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-fitzgerald-002',
+    title: 'Great Gatsby Framing 见证者叙述·尼克的双重角色',
+    category: 'writing-technique',
+    content: '边缘观察者充当叙述者，以旁观者目光记录中心人物的命运。尼克既是叙述者又是参与者，他的道德立场使盖茨比的悲剧具有了普遍性。',
+    technique_tags: ['见证者叙述', '菲茨杰拉德', '叙事距离', '框架'],
+    source_author: '菲茨杰拉德',
+    source_work: '了不起的盖茨比',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-nabokov-001',
+    title: 'Nabokovian Metafiction 纳博科夫元小说·洛丽塔的叙述陷阱',
+    category: 'writing-technique',
+    content: '叙述者对自身叙述行为的高度自我意识。亨伯特在狱中写他的辩解，他的叙述本身就是他犯罪的一部分，文体炫技本身即道德控诉。',
+    technique_tags: ['元小说', '纳博科夫', '不可靠叙述', '纳博科夫'],
+    source_author: '纳博科夫',
+    source_work: '洛丽塔',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-heller-001',
+    title: 'Black Humor 黑色幽默·第二十二条军规',
+    category: 'writing-technique',
+    content: '以荒诞的喜剧方式处理战争、死亡与官僚体制。约奥拉尼乌斯规定了"如果你能证明自己疯了，就可以停飞；但你一旦提出申请，就证明你头脑清醒"——笑中含泪。',
+    technique_tags: ['黑色幽默', '海勒', '战争', '荒诞'],
+    source_author: '海勒',
+    source_work: '第二十二条军规',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-morrison-001',
+    title: 'Ghost Narrative 幽灵叙事·宠儿',
+    category: 'writing-technique',
+    content: '以死者的视角、记忆或幽灵形象参与叙事。托妮·莫里森的《宠儿》中，死去的婴儿以鬼魂形式回家，是美国奴隶制创伤的文学化身。',
+    technique_tags: ['幽灵叙事', '莫里森', '记忆', '奴隶制'],
+    source_author: '莫里森',
+    source_work: '宠儿',
+    quality_score: 97,
+  },
+
+  // ============================================================
+  // J. 拉丁美洲文学技法 (Marquez, Borges, etc.) - 8条
+  // ============================================================
+
+  {
+    id: 'wt-marquez-001',
+    title: 'Magical Realism 魔幻现实主义·百年孤独的开篇',
+    category: 'writing-technique',
+    content: '魔幻事件以平静语调嵌入日常现实。奥雷里亚诺上校面对行刑队时想起父亲带他看冰块的那个下午——魔幻与现实在同一句话中无缝对接。',
+    technique_tags: ['魔幻现实主义', '马尔克斯', '百年孤独', '魔幻'],
+    source_author: '马尔克斯',
+    source_work: '百年孤独',
+    quality_score: 99,
+  },
+  {
+    id: 'wt-marquez-002',
+    title: 'Cyclical Time 循环时间·马孔多的历史轮回',
+    category: 'writing-technique',
+    content: '历史不进步而循环，人物命运重复祖先的模式。布恩迪亚家族七代人的名字、命运、历史都在重复，时间呈螺旋而非直线，是对拉美历史的深刻隐喻。',
+    technique_tags: ['循环时间', '马尔克斯', '历史', '百年孤独'],
+    source_author: '马尔克斯',
+    source_work: '百年孤独',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-marquez-003',
+    title: 'Collective Voice 集体声音·没有人给他写信的上校',
+    category: 'writing-technique',
+    content: '叙述声音带有集体记忆与地方性谣言的质感，个人叙述溶入群体意识。马尔克斯在上校等待退伍金的漫长日子里，写出了整个小镇的集体心理。',
+    technique_tags: ['集体声音', '马尔克斯', '声音', '等待'],
+    source_author: '马尔克斯',
+    source_work: '没有人给他写信的上校',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-borges-001',
+    title: 'Labyrinthine Metafiction 迷宫元小说·小径分叉的花园',
+    category: 'writing-technique',
+    content: '故事本身关于叙事的本质。崔鹏的曾祖是迷宫制造者，也是无限小说的作者。博尔赫斯以叙事讨论叙事的可能性与限度，迷宫即小说本身。',
+    technique_tags: ['迷宫元小说', '博尔赫斯', '元叙事', '迷宫'],
+    source_author: '博尔赫斯',
+    source_work: '小径分叉的花园',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-borges-002',
+    title: 'Infinite Regress 无限回溯·沙之书',
+    category: 'writing-technique',
+    content: '叙事层层嵌套，书中有书，梦中有梦。博尔赫斯的《沙之书》以一本无限页码的书，隐喻知识的无限与不可穷尽，读者与叙述者一同陷入恐惧。',
+    technique_tags: ['无限回溯', '博尔赫斯', '嵌套', '无穷'],
+    source_author: '博尔赫斯',
+    source_work: '沙之书',
+    quality_score: 96,
+  },
+  {
+    id: 'wt-rulfo-001',
+    title: 'Dead Narrator 死者叙述·佩德罗·巴拉莫',
+    category: 'writing-technique',
+    content: '由死者声音构成叙述，生者与死者的界限消融。鲁尔福以鬼魂的低语构成整部小说，死者与生者的对话打破了生死的叙事边界。',
+    technique_tags: ['死者叙述', '鲁尔福', '墨西哥文学', '鬼魂'],
+    source_author: '胡安·鲁尔福',
+    source_work: '佩德罗·巴拉莫',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-cortazar-001',
+    title: 'Fantastic Intrusion 奇幻闯入·墨西哥的西南高速',
+    category: 'writing-technique',
+    content: '普通现实被一个无法解释的奇异元素打断。科塔萨尔的短篇中，高速公路上一只狗引发的惨案，日常在悄然中崩溃，是奇幻现实主义的拉美先驱。',
+    technique_tags: ['奇幻闯入', '科塔萨尔', '阿根廷', '奇幻'],
+    source_author: '科塔萨尔',
+    source_work: '墨西哥的西南高速',
     quality_score: 93,
+  },
+  {
+    id: 'wt-llosa-001',
+    title: '严酷叙事·绿房子',
+    category: 'writing-technique',
+    content: '巴尔加斯·略萨以多视角叙事处理秘鲁丛林地区的历史暴力。如《绿房子》，四喜凉鞋的事件在不同人物的视角中呈现，真相在碎片中浮现。',
+    technique_tags: ['多视角叙事', '巴尔加斯·略萨', '秘鲁', '暴力'],
+    source_author: '巴尔加斯·略萨',
+    source_work: '绿房子',
+    quality_score: 91,
+  },
+
+  // ============================================================
+  // K. 叙事学与当代理论技法 (Genette, Bakhtin, etc.) - 8条
+  // ============================================================
+
+  {
+    id: 'wt-genette-001',
+    title: 'Focalization 聚焦·谁在看',
+    category: 'writing-technique',
+    content: '区分"谁看"（聚焦者）与"谁说"（叙述者）。零聚焦=全知叙述者，内聚焦=限制性视角。外聚焦=低于角色所知。热奈特的分类系统是现代叙事学的基石。',
+    technique_tags: ['聚焦', '热奈特', '叙事学', '视角'],
+    source_author: '热奈特',
+    source_work: '叙事话语',
+    quality_score: 97,
+  },
+  {
+    id: 'wt-genette-002',
+    title: 'Analepsis 回叙·闪回',
+    category: 'writing-technique',
+    content: '叙事时间回到故事时间之前，补充前因，是内外聚焦转换的常用技法。如《尤利西斯》中布卢姆的回忆，通过回叙建构人物的前史。',
+    technique_tags: ['回叙', '热奈特', '时序', '闪回'],
+    source_author: '热奈特',
+    source_work: '叙事话语',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-genette-003',
+    title: 'Prolepsis 预叙·闪前',
+    category: 'writing-technique',
+    content: '叙事时间跳至故事时间之后，预告结局或制造宿命感。《百年孤独》著名的开篇"多年以后，面对行刑队"即是预叙，时间的三个维度在一个句子中并置。',
+    technique_tags: ['预叙', '热奈特', '时序', '未来'],
+    source_author: '热奈特',
+    source_work: '叙事话语',
+    quality_score: 94,
+  },
+  {
+    id: 'wt-genette-004',
+    title: 'Metalepsis 叙事越界·层次混淆',
+    category: 'writing-technique',
+    content: '叙述者闯入故事世界，或角色意识到自身的虚构性，层次之间的边界被违反。热奈特以此描述第四堵墙的打破，是元小说的理论基础。',
+    technique_tags: ['叙事越界', '热奈特', '元小说', '层次'],
+    source_author: '热奈特',
+    source_work: '叙事话语',
+    quality_score: 92,
+  },
+  {
+    id: 'wt-bakhtin-001',
+    title: 'Dialogism & Polyphony 复调·陀思妥耶夫斯基',
+    category: 'writing-technique',
+    content: '小说中多种意识形态声音平等共存，不被作者声音压制。如《卡拉马佐夫兄弟》中，大法官的独白、佐西马长老的教诲、伊万弟弟的诗学，各有其真理。',
+    technique_tags: ['复调', '巴赫金', '多声部', '陀思妥耶夫斯基'],
+    source_author: '巴赫金',
+    source_work: '陀思妥耶夫斯基诗学',
+    quality_score: 98,
+  },
+  {
+    id: 'wt-bakhtin-002',
+    title: 'Heteroglossia 杂语性·小说语言的社会性',
+    category: 'writing-technique',
+    content: '小说语言是社会性的多元声音集合。巴赫金认为，小说的本质是"多语言意识在单一文本中的相互作用的特殊艺术形式"。',
+    technique_tags: ['杂语性', '巴赫金', '社会语言', '小说'],
+    source_author: '巴赫金',
+    source_work: '话语体裁理论',
+    quality_score: 95,
+  },
+  {
+    id: 'wt-chomsky-001',
+    title: 'Defamiliarization 陌生化·文学的语言自觉',
+    category: 'writing-technique',
+    content: '打破自动化感知，以新奇的方式呈现熟悉事物，迫使读者重新感知语言与现实。什克洛夫斯基的俄国形式主义命题："艺术即陌生化。"',
+    technique_tags: ['陌生化', '什克洛夫斯基', '形式主义', '感知'],
+    source_author: '什克洛夫斯基',
+    source_work: '作为技法的艺术',
+    quality_score: 93,
+  },
+  {
+    id: 'wt-intertext-001',
+    title: 'Intertextuality 互文性·文本的网络',
+    category: 'writing-technique',
+    content: '每部文本皆为其他文本的引用与改写，意义在文本网络中生成而非孤立产生。如《尤利西斯》与《奥德赛》的互文，使日常获得史诗的重量。',
+    technique_tags: ['互文性', '克里斯蒂娃', '引用', '文本网络'],
+    source_author: '克里斯蒂娃',
+    source_work: '符号学',
+    quality_score: 94,
   },
 ];
 
@@ -453,25 +2119,17 @@ const visualLensExamples: ReferenceExample[] = [
 // ============================================================
 
 export function initializeReferenceLibraries(): void {
-  // Chinese Classical
-  registerReferenceExamples(chineseClassicalExamples);
-
-  // Chinese Modern
-  registerReferenceExamples(chineseModernExamples);
-
-  // Western Classical
-  registerReferenceExamples(westernClassicalExamples);
-
-  // Western Modern
-  registerReferenceExamples(westernModernExamples);
-
-  // Narrative Framework
   registerReferenceExamples(narrativeFrameworkExamples);
-
-  // Visual Lens
   registerReferenceExamples(visualLensExamples);
+  registerReferenceExamples(writingTechniqueExamples);
 
-  console.log('[ReferenceLibrary] Initialized with examples:', getReferenceLibraryStats());
+  const stats = getReferenceLibraryStats();
+  console.log(
+    `[ReferenceLibrary] Initialized: ` +
+    `narrative-framework=${stats['narrative-framework'].count} examples, ` +
+    `visual-lens=${stats['visual-lens'].count} examples, ` +
+    `writing-technique=${stats['writing-technique'].count} examples`
+  );
 }
 
 // Auto-initialize on module load

@@ -14,6 +14,7 @@ const MEMORY_TYPE_LABELS: Record<MemoryType, string> = {
   narrative: '📖 叙事与人物',
   style: '🎨 风格指南',
   canon: '⚡ 时间线与事实',
+  foreshadow: '🔀 伏笔与回收',
   user: '👤 用户记忆',
 };
 
@@ -36,14 +37,12 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      // Fetch charter
       const charterRes = await fetch(`/api/projects/${projectId}/charter`);
       if (charterRes.ok) {
         const charterPayload = await charterRes.json();
         setCharter(charterPayload.data?.charter ?? null);
       }
 
-      // Fetch memories
       const memoriesRes = await fetch(`/api/memories?projectId=${projectId}`);
       if (memoriesRes.ok) {
         const memoriesPayload = await memoriesRes.json();
@@ -162,7 +161,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
   return (
     <div className="flex-1 overflow-y-auto bg-white p-6">
       <div className="max-w-3xl mx-auto">
-        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-gray-900">项目 Charter</h2>
           <button
@@ -205,7 +203,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
           </div>
         ) : (
           <>
-            {/* Tabs */}
             <div className="flex gap-2 mb-6 border-b border-gray-200">
               <button
                 onClick={() => setActiveTab('charter')}
@@ -231,7 +228,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
 
             {activeTab === 'charter' ? (
               <div className="space-y-6">
-                {/* Theme */}
                 <div className="bg-gray-50 rounded-xl p-5">
                   <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">核心主题</div>
                   <div className="text-gray-900">
@@ -239,7 +235,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
                   </div>
                 </div>
 
-                {/* Core Conflict */}
                 <div className="bg-gray-50 rounded-xl p-5">
                   <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">核心冲突</div>
                   <div className="text-gray-900">
@@ -247,7 +242,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
                   </div>
                 </div>
 
-                {/* Target Audience & Viewpoint */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-gray-50 rounded-xl p-5">
                     <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">目标读者</div>
@@ -263,7 +257,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
                   </div>
                 </div>
 
-                {/* Style Keywords */}
                 <div className="bg-gray-50 rounded-xl p-5">
                   <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">风格关键词</div>
                   <div className="flex flex-wrap gap-2">
@@ -276,7 +269,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
                   </div>
                 </div>
 
-                {/* Writing Goals */}
                 <div className="bg-gray-50 rounded-xl p-5">
                   <div className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">写作目标</div>
                   <div className="space-y-2">
@@ -290,7 +282,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
                   </div>
                 </div>
 
-                {/* Forbidden Rules */}
                 <div className="bg-red-50 rounded-xl p-5">
                   <div className="text-sm font-semibold text-red-600 uppercase tracking-wider mb-2">禁忌事项</div>
                   <div className="space-y-2">
@@ -306,7 +297,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
               </div>
             ) : (
               <>
-                {/* Add Memory Button */}
                 <button
                   onClick={() => setShowAddMemory(true)}
                   className="mb-6 w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors flex items-center justify-center gap-2"
@@ -317,7 +307,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
                   添加记忆
                 </button>
 
-                {/* Memories by Type */}
                 <div className="space-y-6">
                   {(Object.keys(MEMORY_TYPE_LABELS) as MemoryType[]).map((memType) => {
                     const typeMemories = memoriesByType[memType];
@@ -346,7 +335,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
         )}
       </div>
 
-      {/* Edit Memory Modal */}
       {editingMemory && (
         <MemoryEditModal
           memory={editingMemory}
@@ -355,7 +343,6 @@ export function CharterPanel({ projectId, isOpen }: CharterPanelProps) {
         />
       )}
 
-      {/* Add Memory Modal */}
       {showAddMemory && (
         <AddMemoryModal
           onClose={() => setShowAddMemory(false)}
@@ -556,6 +543,7 @@ function AddMemoryModal({ onClose, onSave }: AddMemoryModalProps) {
               <option value="narrative">📖 叙事与人物</option>
               <option value="style">🎨 风格指南</option>
               <option value="canon">⚡ 时间线与事实</option>
+              <option value="foreshadow">🔀 伏笔与回收</option>
               <option value="user">👤 用户记忆</option>
             </select>
           </div>
