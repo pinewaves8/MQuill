@@ -192,6 +192,51 @@ export class SkillConfigurator {
         additionalSystemHints: recommendation.systemHints,
         weights: {},
       },
+      // Scene Event Skills
+      'scene-retrieval-skill': {
+        enabled: true,
+        techniqueDirectives: [],
+        referenceExamples: retrieveReferenceExamples({
+          libraryId: 'scene-library',
+          mode: 'hybrid',
+          maxExamples: 3,
+        }),
+        additionalSystemHints: this.getSceneRetrievalHints(profile),
+        weights: {},
+      },
+      'event-retrieval-skill': {
+        enabled: true,
+        techniqueDirectives: [],
+        referenceExamples: retrieveReferenceExamples({
+          libraryId: 'event-library',
+          mode: 'hybrid',
+          maxExamples: 3,
+        }),
+        additionalSystemHints: this.getEventRetrievalHints(profile),
+        weights: {},
+      },
+      'scene-event-composer-skill': {
+        enabled: true,
+        techniqueDirectives: this.getComposerDirectives(),
+        referenceExamples: retrieveReferenceExamples({
+          libraryId: 'scene-event-pattern',
+          mode: 'hybrid',
+          maxExamples: 2,
+        }),
+        additionalSystemHints: [],
+        weights: {},
+      },
+      'scene-event-polish-skill': {
+        enabled: true,
+        techniqueDirectives: [],
+        referenceExamples: retrieveReferenceExamples({
+          libraryId: 'scene-event-example',
+          mode: 'hybrid',
+          maxExamples: 2,
+        }),
+        additionalSystemHints: this.getPolishHints(profile),
+        weights: {},
+      },
     };
   }
 
@@ -300,6 +345,90 @@ export class SkillConfigurator {
     }
 
     return weights;
+  }
+
+  /**
+   * Get scene retrieval hints based on novel profile
+   */
+  private getSceneRetrievalHints(profile: NovelProfile): string[] {
+    const hints: string[] = [];
+    const genreStr = profile.genre.join(',');
+
+    if (genreStr.includes('武侠')) {
+      hints.push('优先选择具有江湖气息、封闭空间、江湖规矩的场景');
+    }
+    if (genreStr.includes('悬疑')) {
+      hints.push('优先选择具有信息不对称、观察空间、隐蔽性高的场景');
+    }
+    if (genreStr.includes('都市')) {
+      hints.push('优先选择具有都市肌理、日常感、暗流涌动感的场景');
+    }
+    if (genreStr.includes('科幻')) {
+      hints.push('优先选择具有技术奇点、密闭空间、未来感的场景');
+    }
+
+    return hints;
+  }
+
+  /**
+   * Get event retrieval hints based on novel profile
+   */
+  private getEventRetrievalHints(profile: NovelProfile): string[] {
+    const hints: string[] = [];
+    const genreStr = profile.genre.join(',');
+
+    if (genreStr.includes('悬疑')) {
+      hints.push('优先选择信息揭示型、真相揭露型事件');
+    }
+    if (genreStr.includes('武侠')) {
+      hints.push('优先选择冲突升级、对峙、命运转折型事件');
+    }
+    if (genreStr.includes('都市')) {
+      hints.push('优先选择关系变化、内心挣扎型事件');
+    }
+
+    return hints;
+  }
+
+  /**
+   * Get composer directives for scene-event composition
+   */
+  private getComposerDirectives(): import('./skill-interface').TechniqueDirective[] {
+    return [
+      {
+        technique_id: 'scene-event-composition',
+        technique_name: '场景事件组合',
+        application_hint: '确保场景与事件在氛围、功能上相互强化',
+        priority: 'high',
+      },
+      {
+        technique_id: 'anti-cliché',
+        technique_name: '反套路化',
+        application_hint: '避免使用过度常见的场景事件组合',
+        priority: 'high',
+      },
+    ];
+  }
+
+  /**
+   * Get polish hints based on novel profile
+   */
+  private getPolishHints(profile: NovelProfile): string[] {
+    const hints: string[] = [];
+    const toneStr = profile.tone.join(',');
+    const genreStr = profile.genre.join(',');
+
+    if (toneStr.includes('暗黑') || toneStr.includes('虐心')) {
+      hints.push('保持克制冷静的语调，避免过度情绪化');
+    }
+    if (toneStr.includes('治愈') || toneStr.includes('温馨')) {
+      hints.push('强化意境描写，增加留白与余韵');
+    }
+    if (genreStr.includes('悬疑')) {
+      hints.push('强化悬念钩子，提升信息不对称');
+    }
+
+    return hints;
   }
 }
 

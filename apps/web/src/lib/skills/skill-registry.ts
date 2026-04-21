@@ -342,6 +342,184 @@ SKILL_MANIFEST[publishabilitySkill.skill_id] = {
 };
 
 // ============================================================
+// Scene Event Skills
+// ============================================================
+
+// Scene Retrieval Skill
+const sceneRetrievalSkill: BaseSkill = {
+  skill_id: 'scene-retrieval-skill',
+  skill_name: 'Scene Retrieval Skill',
+  description: 'Retrieves scene templates based on narrative requirements',
+  version: '1.0.0',
+  input_schema: {
+    projectId: '',
+    genre: '',
+    era: '',
+    intensity: 0,
+    tone: '',
+    narrative_function: [],
+    retrieval_mode: 'hybrid',
+    max_results: 5,
+  },
+  output_schema: {
+    status: 'completed',
+    deliverable: null,
+  },
+  execution_config: buildExecutionConfig(
+    'anthropic',
+    'claude-sonnet-4-7',
+    0.6,
+    8192,
+    ['lore', 'narrative', 'style'],
+    ['scene-library']
+  ),
+  loop_config: {
+    upstream_skill: 'outline-skill',
+    downstream_skills: ['scene-event-composer-skill'],
+    retry_on_fail: true,
+    quality_threshold: 60,
+    max_loop_attempts: 2,
+    decision_logic: 'gate_based',
+  },
+};
+
+SKILL_MANIFEST[sceneRetrievalSkill.skill_id] = {
+  skill: sceneRetrievalSkill,
+  handler: './skills/scene-retrieval-skill.ts',
+};
+
+// Event Retrieval Skill
+const eventRetrievalSkill: BaseSkill = {
+  skill_id: 'event-retrieval-skill',
+  skill_name: 'Event Retrieval Skill',
+  description: 'Retrieves event templates based on narrative requirements',
+  version: '1.0.0',
+  input_schema: {
+    projectId: '',
+    event_type: [],
+    genre: '',
+    intensity: 0,
+    pace_impact: 'steady',
+    narrative_function: [],
+    retrieval_mode: 'hybrid',
+    max_results: 5,
+  },
+  output_schema: {
+    status: 'completed',
+    deliverable: null,
+  },
+  execution_config: buildExecutionConfig(
+    'anthropic',
+    'claude-sonnet-4-7',
+    0.6,
+    8192,
+    ['lore', 'narrative', 'style'],
+    ['event-library']
+  ),
+  loop_config: {
+    upstream_skill: 'outline-skill',
+    downstream_skills: ['scene-event-composer-skill'],
+    retry_on_fail: true,
+    quality_threshold: 60,
+    max_loop_attempts: 2,
+    decision_logic: 'gate_based',
+  },
+};
+
+SKILL_MANIFEST[eventRetrievalSkill.skill_id] = {
+  skill: eventRetrievalSkill,
+  handler: './skills/event-retrieval-skill.ts',
+};
+
+// SceneEvent Composer Skill
+const sceneEventComposerSkill: BaseSkill = {
+  skill_id: 'scene-event-composer-skill',
+  skill_name: 'SceneEvent Composer Skill',
+  description: 'Composites scenes and events into structured scene event cards',
+  version: '1.0.0',
+  input_schema: {
+    projectId: '',
+    chapter_goal: '',
+    scene_goal: '',
+    required_functions: [],
+    candidate_scenes: [],
+    candidate_events: [],
+    character_states: {},
+    tone_style: '',
+    intensity_target: 5,
+    forbidden_cliches: [],
+    candidate_count: 3,
+  },
+  output_schema: {
+    status: 'completed',
+    deliverable: null,
+  },
+  execution_config: buildExecutionConfig(
+    'anthropic',
+    'claude-sonnet-4-7',
+    0.7,
+    8192,
+    ['lore', 'narrative', 'style', 'memory', 'constraints'],
+    ['scene-event-pattern', 'scene-library', 'event-library']
+  ),
+  loop_config: {
+    upstream_skill: null,
+    downstream_skills: ['scene-event-polish-skill', 'write-skill'],
+    retry_on_fail: true,
+    quality_threshold: 65,
+    max_loop_attempts: 3,
+    decision_logic: 'iterate_or_advance',
+  },
+};
+
+SKILL_MANIFEST[sceneEventComposerSkill.skill_id] = {
+  skill: sceneEventComposerSkill,
+  handler: './skills/scene-event-composer-skill.ts',
+};
+
+// SceneEvent Polish Skill
+const sceneEventPolishSkill: BaseSkill = {
+  skill_id: 'scene-event-polish-skill',
+  skill_name: 'SceneEvent Polish Skill',
+  description: 'Polishes scene event cards by reducing cliché and enhancing originality',
+  version: '1.0.0',
+  input_schema: {
+    projectId: '',
+    scene_event_card: {},
+    polish_goals: [],
+    novel_style_keywords: [],
+    forbidden_expressions: [],
+    genre: '',
+    intensity_adjustment: 0,
+  },
+  output_schema: {
+    status: 'completed',
+    deliverable: null,
+  },
+  execution_config: buildExecutionConfig(
+    'anthropic',
+    'claude-sonnet-4-7',
+    0.5,
+    4096,
+    ['lore', 'narrative', 'style', 'constraints'],
+    ['scene-event-example']
+  ),
+  loop_config: {
+    upstream_skill: 'scene-event-composer-skill',
+    downstream_skills: ['write-skill'],
+    retry_on_fail: true,
+    quality_threshold: 70,
+    max_loop_attempts: 2,
+    decision_logic: 'iterate_or_advance',
+  },
+};
+
+SKILL_MANIFEST[sceneEventPolishSkill.skill_id] = {
+  skill: sceneEventPolishSkill,
+  handler: './skills/scene-event-polish-skill.ts',
+};
+
+// ============================================================
 // Utility Functions
 // ============================================================
 

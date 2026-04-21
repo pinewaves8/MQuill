@@ -13,7 +13,15 @@
  * Supports semantic and keyword retrieval modes.
  */
 
-import type { ReferenceExample, ReferenceLibraryType } from './skill-interface';
+import type {
+  ReferenceExample,
+  ReferenceLibraryType,
+  SceneTemplate,
+  EventTemplate,
+  SceneEventPattern,
+  NarrativeFunction,
+  EventType,
+} from './skill-interface';
 
 // ============================================================
 // Library Data Structure
@@ -44,6 +52,34 @@ const libraries: Record<ReferenceLibraryType, ReferenceLibrary> = {
   },
   'writing-technique': {
     library_id: 'writing-technique',
+    examples: [],
+    tags: new Set(),
+    workIndex: new Map(),
+    tagIndex: new Map(),
+  },
+  'scene-library': {
+    library_id: 'scene-library',
+    examples: [],
+    tags: new Set(),
+    workIndex: new Map(),
+    tagIndex: new Map(),
+  },
+  'event-library': {
+    library_id: 'event-library',
+    examples: [],
+    tags: new Set(),
+    workIndex: new Map(),
+    tagIndex: new Map(),
+  },
+  'scene-event-pattern': {
+    library_id: 'scene-event-pattern',
+    examples: [],
+    tags: new Set(),
+    workIndex: new Map(),
+    tagIndex: new Map(),
+  },
+  'scene-event-example': {
+    library_id: 'scene-event-example',
     examples: [],
     tags: new Set(),
     workIndex: new Map(),
@@ -128,6 +164,10 @@ export function getReferenceLibraryStats(): Record<ReferenceLibraryType, { count
     'narrative-framework': { count: libraries['narrative-framework'].examples.length, tags: libraries['narrative-framework'].tags.size },
     'visual-lens': { count: libraries['visual-lens'].examples.length, tags: libraries['visual-lens'].tags.size },
     'writing-technique': { count: libraries['writing-technique'].examples.length, tags: libraries['writing-technique'].tags.size },
+    'scene-library': { count: libraries['scene-library'].examples.length, tags: libraries['scene-library'].tags.size },
+    'event-library': { count: libraries['event-library'].examples.length, tags: libraries['event-library'].tags.size },
+    'scene-event-pattern': { count: libraries['scene-event-pattern'].examples.length, tags: libraries['scene-event-pattern'].tags.size },
+    'scene-event-example': { count: libraries['scene-event-example'].examples.length, tags: libraries['scene-event-example'].tags.size },
   };
 }
 
@@ -144,6 +184,232 @@ export function clearLibrary(libraryId: ReferenceLibraryType): void {
   library.tags.clear();
   library.workIndex.clear();
   library.tagIndex.clear();
+}
+
+// ============================================================
+// Scene Event Library Registration & Retrieval
+// ============================================================
+
+export function registerSceneTemplate(template: SceneTemplate): void {
+  const library = libraries['scene-library'];
+  if (!library) return;
+
+  const example: ReferenceExample = {
+    id: template.id,
+    title: template.name,
+    category: 'scene-library',
+    content: template.description,
+    technique_tags: [
+      ...template.genre_tags,
+      ...template.era_tags,
+      ...template.mood_tags,
+      ...template.common_functions,
+    ],
+    source_work: template.source_work,
+    quality_score: template.originality_score,
+  };
+
+  if (library.examples.some((e) => e.id === example.id)) return;
+  library.examples.push(example);
+
+  for (const tag of example.technique_tags || []) {
+    library.tags.add(tag);
+    const existing = library.tagIndex.get(tag) ?? [];
+    existing.push(example);
+    library.tagIndex.set(tag, existing);
+  }
+}
+
+export function registerEventTemplate(template: EventTemplate): void {
+  const library = libraries['event-library'];
+  if (!library) return;
+
+  const example: ReferenceExample = {
+    id: template.id,
+    title: template.name,
+    category: 'event-library',
+    content: template.description,
+    technique_tags: [
+      ...template.genre_tags,
+      template.event_type,
+      template.information_role,
+    ],
+    quality_score: template.originality_score,
+  };
+
+  if (library.examples.some((e) => e.id === example.id)) return;
+  library.examples.push(example);
+
+  for (const tag of example.technique_tags || []) {
+    library.tags.add(tag);
+    const existing = library.tagIndex.get(tag) ?? [];
+    existing.push(example);
+    library.tagIndex.set(tag, existing);
+  }
+}
+
+export function registerSceneEventPattern(pattern: SceneEventPattern): void {
+  const library = libraries['scene-event-pattern'];
+  if (!library) return;
+
+  const example: ReferenceExample = {
+    id: pattern.id,
+    title: pattern.name,
+    category: 'scene-event-pattern',
+    content: pattern.description,
+    technique_tags: pattern.tone_variants,
+    quality_score: pattern.effectiveness_score,
+  };
+
+  if (library.examples.some((e) => e.id === example.id)) return;
+  library.examples.push(example);
+
+  for (const tag of example.technique_tags || []) {
+    library.tags.add(tag);
+    const existing = library.tagIndex.get(tag) ?? [];
+    existing.push(example);
+    library.tagIndex.set(tag, existing);
+  }
+}
+
+export interface SceneRetrievalOptions extends RetrievalOptions {
+  narrative_function?: NarrativeFunction[];
+  intensity?: number;
+  danger_level?: number;
+  secrecy_level?: number;
+  location_type?: string;
+}
+
+export function retrieveSceneTemplates(options: SceneRetrievalOptions): SceneTemplate[] {
+  const library = libraries['scene-library'];
+  if (!library) return [];
+
+  let candidates = [...library.examples];
+  const maxResults = options.maxExamples ?? 5;
+
+  // Filter by tags
+  if (options.tags && options.tags.length > 0) {
+    candidates = candidates.filter((e) =>
+      e.technique_tags?.some((tag) => options.tags!.includes(tag))
+    );
+  }
+
+  // Filter by genre
+  if (options.tags && options.tags.some((t) => ['武侠', '悬疑', '都市', '科幻', '侦探'].includes(t))) {
+    candidates = candidates.filter((e) =>
+      e.technique_tags?.some((tag) => options.tags!.includes(tag))
+    );
+  }
+
+  // Sort by quality score
+  candidates.sort((a, b) => (a.quality_score ?? 50) - (b.quality_score ?? 50));
+  candidates.reverse();
+
+  return candidates.slice(0, maxResults).map((e) => ({
+    id: e.id,
+    name: e.title,
+    description: e.content,
+    genre_tags: e.technique_tags?.filter((t) => ['武侠', '悬疑', '都市', '科幻', '侦探'].includes(t)) ?? [],
+    era_tags: e.technique_tags?.filter((t) => ['古代', '近代', '现代', '未来', '架空'].includes(t)) ?? [],
+    location_type: '',
+    time_type: '',
+    weather: '',
+    space_structure: '',
+    mood_tags: [],
+    public_private_level: 5,
+    danger_level: 5,
+    secrecy_level: 5,
+    sensory_features: [],
+    social_rules: [],
+    affordances: [],
+    constraints: [],
+    typical_characters: [],
+    common_conflicts: [],
+    common_functions: [],
+    originality_score: e.quality_score,
+  }));
+}
+
+export interface EventRetrievalOptions extends RetrievalOptions {
+  event_type?: EventType[];
+  narrative_function?: NarrativeFunction[];
+  intensity?: number;
+}
+
+export function retrieveEventTemplates(options: EventRetrievalOptions): EventTemplate[] {
+  const library = libraries['event-library'];
+  if (!library) return [];
+
+  let candidates = [...library.examples];
+  const maxResults = options.maxExamples ?? 5;
+
+  // Filter by tags
+  if (options.tags && options.tags.length > 0) {
+    candidates = candidates.filter((e) =>
+      e.technique_tags?.some((tag) => options.tags!.includes(tag))
+    );
+  }
+
+  // Sort by quality score
+  candidates.sort((a, b) => (a.quality_score ?? 50) - (b.quality_score ?? 50));
+  candidates.reverse();
+
+  return candidates.slice(0, maxResults).map((e) => ({
+    id: e.id,
+    name: e.title,
+    description: e.content,
+    genre_tags: e.technique_tags ?? [],
+    event_type: (e.technique_tags?.[0] as EventType) ?? 'encounter',
+    trigger_conditions: [],
+    participants: [],
+    participant_count: 2,
+    core_conflict: '',
+    stakes: '',
+    information_role: '',
+    emotion_curve: [],
+    intensity: 5,
+    reversibility: 5,
+    dialogue_density: 'medium',
+    action_density: 'medium',
+    pace_impact: 'steady',
+    common_outcomes: [],
+    twist_options: [],
+    originality_score: e.quality_score,
+  }));
+}
+
+export function retrieveSceneEventPatterns(options: RetrievalOptions): SceneEventPattern[] {
+  const library = libraries['scene-event-pattern'];
+  if (!library) return [];
+
+  let candidates = [...library.examples];
+  const maxResults = options.maxExamples ?? 5;
+
+  if (options.tags && options.tags.length > 0) {
+    candidates = candidates.filter((e) =>
+      e.technique_tags?.some((tag) => options.tags!.includes(tag))
+    );
+  }
+
+  candidates.sort((a, b) => (a.quality_score ?? 50) - (b.quality_score ?? 50));
+  candidates.reverse();
+
+  return candidates.slice(0, maxResults).map((e) => ({
+    id: e.id,
+    name: e.title,
+    description: e.content,
+    scene_id: '',
+    event_id: '',
+    fit_score: e.quality_score ?? 7,
+    why_it_works: '',
+    typical_usage: [],
+    tone_variants: e.technique_tags ?? [],
+    cliché_risk: 5,
+    subversion_options: [],
+    upgrade_methods: [],
+    example_outline: '',
+    effectiveness_score: e.quality_score,
+  }));
 }
 
 // ============================================================
@@ -2123,14 +2389,763 @@ export function initializeReferenceLibraries(): void {
   registerReferenceExamples(visualLensExamples);
   registerReferenceExamples(writingTechniqueExamples);
 
+  // Initialize scene event libraries
+  initializeSceneEventLibraries();
+
   const stats = getReferenceLibraryStats();
   console.log(
     `[ReferenceLibrary] Initialized: ` +
     `narrative-framework=${stats['narrative-framework'].count} examples, ` +
     `visual-lens=${stats['visual-lens'].count} examples, ` +
-    `writing-technique=${stats['writing-technique'].count} examples`
+    `writing-technique=${stats['writing-technique'].count} examples, ` +
+    `scene-library=${stats['scene-library'].count}, ` +
+    `event-library=${stats['event-library'].count}, ` +
+    `scene-event-pattern=${stats['scene-event-pattern'].count}`
   );
 }
+
+// ============================================================
+// SCENE EVENT LIBRARY SEED DATA
+// ============================================================
+
+function initializeSceneEventLibraries(): void {
+  // Register scene templates
+  for (const scene of sceneTemplates) {
+    registerSceneTemplate(scene);
+  }
+
+  // Register event templates
+  for (const event of eventTemplates) {
+    registerEventTemplate(event);
+  }
+
+  // Register scene-event patterns
+  for (const pattern of sceneEventPatterns) {
+    registerSceneEventPattern(pattern);
+  }
+}
+
+// Scene Templates - 场景原型种子数据
+const sceneTemplates: SceneTemplate[] = [
+  // ==================== 武侠场景 ====================
+  {
+    id: 'scene_wuxia_dock_night',
+    name: '江湖码头夜雾',
+    description: '薄雾笼罩的江湖码头，潮声与船楫声交织，人流混杂身份难辨',
+    genre_tags: ['武侠', '江湖'],
+    era_tags: ['古代', '架空'],
+    location_type: '码头',
+    time_type: '夜晚',
+    weather: '薄雾',
+    space_structure: '开阔但有货栈遮挡',
+    mood_tags: ['漂泊', '压抑', '杀机潜伏'],
+    public_private_level: 6,
+    danger_level: 7,
+    secrecy_level: 6,
+    sensory_features: ['潮声', '木板湿滑', '灯火摇晃', '船楫声'],
+    social_rules: ['人流杂', '身份混杂', '容易潜伏'],
+    affordances: ['偶遇', '跟踪', '接头', '伏击', '离别'],
+    constraints: ['视线受雾影响', '人多易掩护', '逃跑路线复杂'],
+    typical_characters: ['江湖客', '船家', '商旅', '潜伏者'],
+    common_conflicts: ['埋伏', '旧识重逢', '情报交换'],
+    common_functions: ['引入主角', '埋钩子', '制造危险'],
+    cliché_risk: 6,
+    originality_score: 4,
+  },
+  {
+    id: 'scene_wuxia_inn_room',
+    name: '客栈二楼雅间',
+    description: '江湖客栈的二楼雅间，隔音不佳却视野开阔，常有江湖人借住',
+    genre_tags: ['武侠', '江湖'],
+    era_tags: ['古代', '架空'],
+    location_type: '客栈',
+    time_type: '任意',
+    weather: '任意',
+    space_structure: '半封闭，多窗户',
+    mood_tags: ['暂时安全', '暗流涌动', '信息交汇'],
+    public_private_level: 4,
+    danger_level: 5,
+    secrecy_level: 4,
+    sensory_features: ['酒香', '人声嘈杂', '楼梯声响', '窗外街景'],
+    social_rules: ['江湖规矩', '不问来历', '客栈中立'],
+    affordances: ['偷听', '接头', '跟踪监视', '意外相遇'],
+    constraints: ['隔音差', '出入有记录', '可能被包围'],
+    typical_characters: ['江湖客', '店小二', '神秘住客'],
+    common_conflicts: ['隔墙有耳', '误听秘密', '被迫卷入'],
+    common_functions: ['情报交换', '人物引出', '冲突预埋'],
+    cliché_risk: 7,
+    originality_score: 3,
+  },
+  {
+    id: 'scene_wuxia_arena',
+    name: '江湖比武场',
+    description: '帮派或武林盟的比武场，既有正式擂台，也有私下的生死场',
+    genre_tags: ['武侠'],
+    era_tags: ['古代'],
+    location_type: '比武场',
+    time_type: '白天',
+    weather: '任意',
+    space_structure: '开阔环形',
+    mood_tags: ['紧张', '热血', '危机四伏'],
+    public_private_level: 8,
+    danger_level: 8,
+    secrecy_level: 2,
+    sensory_features: ['人声鼎沸', '兵器交击', '尘土飞扬'],
+    social_rules: ['江湖规矩', '胜者为王', '见证人在场'],
+    affordances: ['公开挑战', '暗中作弊', '借机报复'],
+    constraints: ['人多眼杂', '逃跑困难', '有权威在场'],
+    typical_characters: ['比武者', '裁判', '观众', '暗中操纵者'],
+    common_conflicts: ['比赛作弊', '借机报仇', '揭露秘密'],
+    common_functions: ['展示实力', '制造冲突', '引出新人物'],
+    cliché_risk: 6,
+    originality_score: 4,
+  },
+  // ==================== 悬疑场景 ====================
+  {
+    id: 'scene_suspense_hospital_corridor',
+    name: '医院抢救室外走廊',
+    description: '惨白灯光下的医院走廊，等候的家属神情焦虑，护士匆匆往来',
+    genre_tags: ['悬疑', '都市'],
+    era_tags: ['现代'],
+    location_type: '医院走廊',
+    time_type: '深夜',
+    weather: '室内',
+    space_structure: '封闭狭长',
+    mood_tags: ['紧张', '焦虑', '未知'],
+    public_private_level: 5,
+    danger_level: 4,
+    secrecy_level: 3,
+    sensory_features: ['消毒水味', '脚步声回荡', '心电监护仪声'],
+    social_rules: ['禁止喧哗', '家属等候'],
+    affordances: ['等待消息', '偷听', '身份掩护', '观察'],
+    constraints: ['公共空间', '可能有监控'],
+    typical_characters: ['家属', '医生', '警察', '可疑者'],
+    common_conflicts: ['生死未卜', '秘密交易', '身份接近'],
+    common_functions: ['制造悬念', '揭示信息', '关系推进'],
+    cliché_risk: 4,
+    originality_score: 6,
+  },
+  {
+    id: 'scene_suspense_old_library',
+    name: '深夜旧图书馆',
+    description: '堆满古籍的旧图书馆，深夜只有保安巡逻，某些区域灯光昏暗',
+    genre_tags: ['悬疑', '推理'],
+    era_tags: ['现代', '近代'],
+    location_type: '图书馆',
+    time_type: '深夜',
+    weather: '室内',
+    space_structure: '分割多区，有禁区',
+    mood_tags: ['神秘', '寂静', '知识压迫感'],
+    public_private_level: 3,
+    danger_level: 5,
+    secrecy_level: 7,
+    sensory_features: ['书页翻动声', '脚步声回荡', '霉味', '老旧木头吱呀声'],
+    social_rules: ['安静规则', '限制区域', '保安巡逻'],
+    affordances: ['藏身', '偷窃', '秘密会面', '发现线索'],
+    constraints: ['有监控', '保安巡逻', '深夜出入有记录'],
+    typical_characters: ['研究者', '保安', '神秘访客', '图书管理员'],
+    common_conflicts: ['发现秘密档案', '遭遇伏击', '被困禁区'],
+    common_functions: ['埋设伏笔', '揭示真相', '制造神秘感'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+  {
+    id: 'scene_suspense_train_compartment',
+    name: '列车包厢',
+    description: '长途列车的独立包厢，空间封闭，人员流动，是天然的密室审讯环境',
+    genre_tags: ['悬疑', '推理', '都市'],
+    era_tags: ['现代'],
+    location_type: '火车包厢',
+    time_type: '夜间',
+    weather: '室内',
+    space_structure: '完全封闭，移动中',
+    mood_tags: ['隔绝', '紧张', '被迫面对'],
+    public_private_level: 1,
+    danger_level: 7,
+    secrecy_level: 9,
+    sensory_features: ['车轮声', '晃动感', '狭窄感', '邻厢动静'],
+    social_rules: ['包厢内隐私', '行驶中无法逃脱', '有限空间'],
+    affordances: ['审讯', '交易', '伏击', '意外相遇'],
+    constraints: ['无法逃脱', '声音隔离', '可能被监听'],
+    typical_characters: ['神秘旅客', '调查者', '嫌疑人', '目击者'],
+    common_conflicts: ['逼问真相', '中途上车者', '行李藏秘密'],
+    common_functions: ['隔离审讯', '揭示秘密', '制造孤立感'],
+    cliché_risk: 6,
+    originality_score: 4,
+  },
+  // ==================== 都市场景 ====================
+  {
+    id: 'scene_urban_coffee_shop',
+    name: '写字楼底商咖啡馆',
+    description: '白领聚集的连锁咖啡馆，午后满是敲键盘的年轻人，嘈杂却有序',
+    genre_tags: ['都市', '职场'],
+    era_tags: ['现代'],
+    location_type: '咖啡馆',
+    time_type: '午后',
+    weather: '室内',
+    space_structure: '开放空间，少量隔断',
+    mood_tags: ['日常', '暗流', '都市节奏'],
+    public_private_level: 7,
+    danger_level: 2,
+    secrecy_level: 3,
+    sensory_features: ['咖啡香', '键盘声', '背景音乐', '人声嘈杂'],
+    social_rules: ['公共场所', '注重隐私', '陌生人可搭话'],
+    affordances: ['偶遇', '商业机密交换', '暗中观察', '相亲'],
+    constraints: ['公开场合', '可能有熟人', '出入容易'],
+    typical_characters: ['白领', '自由职业者', '约会者', '调查者'],
+    common_conflicts: ['偶遇熟人', '窃听', '误会', '商业谈判'],
+    common_functions: ['引入人物', '制造日常感', '信息交换'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+  {
+    id: 'scene_urban_subway_night',
+    name: '深夜地铁末班车',
+    description: '城市地铁末班车，车厢空旷，灯光惨白，只有零星几个夜归人',
+    genre_tags: ['都市', '现实'],
+    era_tags: ['现代'],
+    location_type: '地铁车厢',
+    time_type: '深夜',
+    weather: '室内',
+    space_structure: '狭长密闭，移动中',
+    mood_tags: ['孤独', '不安', '都市荒凉感'],
+    public_private_level: 5,
+    danger_level: 6,
+    secrecy_level: 4,
+    sensory_features: ['地铁轰鸣', '金属碰撞声', '冷气', '空旷车厢'],
+    social_rules: ['陌生人保持距离', '下车才能离开'],
+    affordances: ['跟踪', '尾随', '偶遇', '意外事件'],
+    constraints: ['无法中途离开', '可能被监控', '有限空间'],
+    typical_characters: ['夜归人', '可疑人物', '地铁工作人员'],
+    common_conflicts: ['被尾随', '发现异常', '被困'],
+    common_functions: ['制造不安感', '引入关键事件', '都市氛围'],
+    cliché_risk: 4,
+    originality_score: 6,
+  },
+  // ==================== 科幻场景 ====================
+  {
+    id: 'scene_scifi_spaceship_corridor',
+    name: '飞船狭长走廊',
+    description: '星际飞船的金属走廊，灯光惨白，空气循环系统低沉嗡鸣',
+    genre_tags: ['科幻'],
+    era_tags: ['未来'],
+    location_type: '飞船走廊',
+    time_type: '任意',
+    weather: '舱内人工环境',
+    space_structure: '狭长密闭，各舱室连通',
+    mood_tags: ['封闭感', '技术压迫', '孤独'],
+    public_private_level: 4,
+    danger_level: 6,
+    secrecy_level: 5,
+    sensory_features: ['金属壁', '循环风声', '设备嗡鸣', '脚步声回响'],
+    social_rules: ['区域权限', '监控无处不在', '船员流动'],
+    affordances: ['藏身', '监听', '设备操控', '紧急事件'],
+    constraints: ['密闭空间', '权限限制', '记录可查'],
+    typical_characters: ['船员', '工程师', '指挥官', '潜入者'],
+    common_conflicts: ['系统被入侵', '内鬼', '生命维持危机'],
+    common_functions: ['制造紧张', '技术悬疑', '密闭恐惧'],
+    cliché_risk: 7,
+    originality_score: 3,
+  },
+  {
+    id: 'scene_scifi_space_station',
+    name: '太空站观测舱',
+    description: '环绕行星的空间站观测舱，巨型透明穹顶外是星空或行星曲面',
+    genre_tags: ['科幻'],
+    era_tags: ['未来'],
+    location_type: '观测舱',
+    time_type: '任意',
+    weather: '太空环境',
+    space_structure: '穹顶开阔，视野极佳',
+    mood_tags: ['渺小感', '宇宙孤独', '壮丽'],
+    public_private_level: 3,
+    danger_level: 5,
+    secrecy_level: 6,
+    sensory_features: ['星光', '飞船经过', '微重力感', '透明穹顶'],
+    social_rules: ['观测优先', '保持安静', '紧急疏散规程'],
+    affordances: ['独处思考', '秘密会面', '外部观察', '逃脱路线'],
+    constraints: ['穹顶脆弱', '紧急闸门', '辐射区'],
+    typical_characters: ['科学家', '舰长', '观察员', '叛变者'],
+    common_conflicts: ['紧急撤离', '发现异常', '叛变', '外星接触'],
+    common_functions: ['制造宇宙孤独感', '宏大背景', '关键决策'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+  // ==================== 侦探场景 ====================
+  {
+    id: 'scene_detective_office',
+    name: '侦探事务所',
+    description: '老式写字楼里的侦探事务所，堆满档案，烟雾缭绕，有种颓废感',
+    genre_tags: ['侦探', '推理'],
+    era_tags: ['现代', '近代'],
+    location_type: '事务所',
+    time_type: '任意',
+    weather: '室内',
+    space_structure: '半开放，档案室隐藏',
+    mood_tags: ['颓废', '烟雾缭绕', '谜题感'],
+    public_private_level: 4,
+    danger_level: 4,
+    secrecy_level: 6,
+    sensory_features: ['烟草味', '档案纸味', '打字机声', '窗外街景'],
+    social_rules: ['客户预约', '不速之客需警惕', '隐私保护'],
+    affordances: ['客户来访', '案件接手', '秘密调查', '伏击'],
+    constraints: ['位置公开', '可能被监视', '档案可能被窃'],
+    typical_characters: ['侦探', '委托人', '线人', '老派警官'],
+    common_conflicts: ['委托人隐瞒', '案件串联', '竞争对手'],
+    common_functions: ['引入案件', '展示侦探风格', '埋设伏笔'],
+    cliché_risk: 8,
+    originality_score: 2,
+  },
+  {
+    id: 'scene_detective_morgue',
+    name: '法医鉴定中心',
+    description: '冰冷的法医鉴定中心，不锈钢台面，存放尸体的冷库，刺鼻的消毒水味',
+    genre_tags: ['侦探', '悬疑', '推理'],
+    era_tags: ['现代'],
+    location_type: '法医中心',
+    time_type: '任意',
+    weather: '室内恒温',
+    space_structure: '分割多区，冷库封闭',
+    mood_tags: ['冰冷', '死亡', '真相揭露'],
+    public_private_level: 2,
+    danger_level: 5,
+    secrecy_level: 7,
+    sensory_features: ['消毒水', '冷气', '金属器械', '冷库存放'],
+    social_rules: ['严格权限', '证据链完整', '法医中立'],
+    affordances: ['尸体检查', '证据发现', '秘密验尸'],
+    constraints: ['需授权', '全程记录', '冷库危险'],
+    typical_characters: ['法医', '侦探', '检察官', '死者家属'],
+    common_conflicts: ['死因存疑', '证据被动手脚', '家属阻挠'],
+    common_functions: ['揭示关键线索', '排除嫌疑人', '案件转折'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+];
+
+// Event Templates - 事件原型种子数据
+const eventTemplates: EventTemplate[] = [
+  // ==================== 武侠事件 ====================
+  {
+    id: 'event_wuxia_secret_note',
+    name: '旧识之仆递来残笺',
+    description: '一个看似普通的信使带来一封残缺的信件或纸条，内容指向关键线索',
+    genre_tags: ['武侠', '悬疑', '权谋'],
+    event_type: 'revelation',
+    trigger_conditions: ['主角独处或半独处', '周围可有旁人掩护'],
+    participants: ['主角', '信使', '潜在监视者'],
+    participant_count: 3,
+    core_conflict: '主角是否接信、是否暴露与旧识的关系',
+    stakes: '旧案重开、身份暴露、被敌方盯上',
+    information_role: '抛出新线索',
+    emotion_curve: ['平静', '微疑', '紧张'],
+    intensity: 4,
+    reversibility: 3,
+    dialogue_density: 'medium',
+    action_density: 'low',
+    pace_impact: 'steady',
+    common_outcomes: ['主角收信', '暗中观察', '转入追杀'],
+    twist_options: ['信是伪造', '送信者被灭口', '信中内容不完整'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+  {
+    id: 'event_wuxia_identity_reveal',
+    name: '当众身份揭露',
+    description: '在公开场合，主角的真实身份或秘密被当众揭穿，引发连锁反应',
+    genre_tags: ['武侠', '权谋'],
+    event_type: 'identity_reveal',
+    trigger_conditions: ['公开场合', '有敌人在场', '有第三方观察者'],
+    participants: ['主角', '揭穿者', '观众'],
+    participant_count: 4,
+    core_conflict: '身份崩塌后的信任危机',
+    stakes: '社会关系破裂、敌人确认、盟友立场动摇',
+    information_role: '强制揭露',
+    emotion_curve: ['平静', '震惊', '混乱', '爆发'],
+    intensity: 9,
+    reversibility: 2,
+    dialogue_density: 'high',
+    action_density: 'medium',
+    pace_impact: 'fast',
+    common_outcomes: ['公开对峙', '关系破裂', '意外盟友出现'],
+    twist_options: ['揭露是误解', '揭穿者有更大目的', '观众中有人暗中相助'],
+    cliché_risk: 7,
+    originality_score: 3,
+  },
+  {
+    id: 'event_wuxia_ambush',
+    name: '密林伏击',
+    description: '在必经之路上设下埋伏，趁目标不备时发动攻击',
+    genre_tags: ['武侠'],
+    event_type: 'trap',
+    trigger_conditions: ['目标独自经过', '埋伏者人数优势'],
+    participants: ['目标', '伏击者', '可能的救助者'],
+    participant_count: 4,
+    core_conflict: '以多敌少，优势明显',
+    stakes: '重伤或死亡、暴露行踪',
+    information_role: '无信息揭示',
+    emotion_curve: ['平静', '紧张', '爆发'],
+    intensity: 8,
+    reversibility: 3,
+    dialogue_density: 'low',
+    action_density: 'high',
+    pace_impact: 'fast',
+    common_outcomes: ['成功击杀', '逃脱', '反杀'],
+    twist_options: ['伏击者有内鬼', '目标早有防备', '第三方介入'],
+    cliché_risk: 8,
+    originality_score: 2,
+  },
+  // ==================== 悬疑事件 ====================
+  {
+    id: 'event_suspense_body_discovered',
+    name: '尸体突然发现',
+    description: '在日常生活场景中突然发现尸体，打破平静',
+    genre_tags: ['悬疑', '推理', '都市'],
+    event_type: 'discovery',
+    trigger_conditions: ['发现者与死者有关', '现场被部分破坏'],
+    participants: ['发现者', '死者', '可能的目击者'],
+    participant_count: 3,
+    core_conflict: '发现者被卷入案件',
+    stakes: '成为嫌疑人、被追杀、真相揭露',
+    information_role: '案件正式开启',
+    emotion_curve: ['平静', '震惊', '恐惧'],
+    intensity: 8,
+    reversibility: 1,
+    dialogue_density: 'low',
+    action_density: 'medium',
+    pace_impact: 'fast',
+    common_outcomes: ['报警', '私下调查', '被灭口威胁'],
+    twist_options: ['发现者与死者有关', '尸体是伪造', '发现不止一具'],
+    cliché_risk: 6,
+    originality_score: 4,
+  },
+  {
+    id: 'event_suspense_evidence_missing',
+    name: '关键证物失踪',
+    description: '之前存在的关键证据突然消失或被盗',
+    genre_tags: ['悬疑', '推理'],
+    event_type: 'discovery',
+    trigger_conditions: ['调查进行中', '有人知道调查方向'],
+    participants: ['调查者', '可能的内鬼', '真凶'],
+    participant_count: 3,
+    core_conflict: '调查被阻碍，真相被掩盖',
+    stakes: '案件可能无法破解、嫌疑人逍遥法外',
+    information_role: '隐藏关键信息',
+    emotion_curve: ['困惑', '怀疑', '愤怒'],
+    intensity: 6,
+    reversibility: 4,
+    dialogue_density: 'medium',
+    action_density: 'medium',
+    pace_impact: 'steady',
+    common_outcomes: ['重新寻找线索', '锁定内鬼', '改变调查方向'],
+    twist_options: ['证物被自己藏起来', '证人被收买', '真凶另有目的'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+  {
+    id: 'event_suspense_witness_testimony',
+    name: '证人证词反转',
+    description: '之前可靠的证人突然改变证词，揭示新的真相',
+    genre_tags: ['悬疑', '推理'],
+    event_type: 'revelation',
+    trigger_conditions: ['证人被威胁', '证人发现新证据', '证人与嫌疑人关系曝光'],
+    participants: ['证人', '侦探', '嫌疑人'],
+    participant_count: 3,
+    core_conflict: '证人可信度崩塌，案件陷入迷雾',
+    stakes: '案件方向逆转、证人安全受威胁',
+    information_role: '揭示隐藏关系',
+    emotion_curve: ['信任', '震惊', '怀疑'],
+    intensity: 7,
+    reversibility: 3,
+    dialogue_density: 'high',
+    action_density: 'low',
+    pace_impact: 'fast',
+    common_outcomes: ['证人说出真相', '证人被杀', '第三方浮出水面'],
+    twist_options: ['证人是被收买', '证人说的是另一种真相', '证人才是真凶'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+  // ==================== 都市事件 ====================
+  {
+    id: 'event_urban_accident_reunion',
+    name: '意外事故中的重逢',
+    description: '在一起意外事故现场，与多年不见的人重逢',
+    genre_tags: ['都市', '现实'],
+    event_type: 'reunion',
+    trigger_conditions: ['事故现场', '双方都在现场'],
+    participants: ['主角', '旧识', '事故相关人员'],
+    participant_count: 3,
+    core_conflict: '旧关系与新情况的碰撞',
+    stakes: '关系修复或破裂、是否卷入事故',
+    information_role: '信息交换',
+    emotion_curve: ['惊讶', '复杂情绪', '紧张'],
+    intensity: 5,
+    reversibility: 6,
+    dialogue_density: 'high',
+    action_density: 'low',
+    pace_impact: 'steady',
+    common_outcomes: ['和解', '发现对方秘密', '一同被卷入'],
+    twist_options: ['事故是故意的', '旧识与事故有关', '重逢打破计划'],
+    cliché_risk: 6,
+    originality_score: 4,
+  },
+  {
+    id: 'event_urban_betrayal',
+    name: '信任之人背叛',
+    description: '最信任的人突然展现出另一面，出卖或背叛',
+    genre_tags: ['都市', '职场'],
+    event_type: 'betrayal',
+    trigger_conditions: ['信任建立后', '利益冲突出现'],
+    participants: ['主角', '背叛者', '第三方'],
+    participant_count: 3,
+    core_conflict: '信任崩塌，世界观动摇',
+    stakes: '重大损失、计划崩溃',
+    information_role: '关系逆转',
+    emotion_curve: ['信任', '震惊', '愤怒', '决裂'],
+    intensity: 9,
+    reversibility: 1,
+    dialogue_density: 'high',
+    action_density: 'medium',
+    pace_impact: 'fast',
+    common_outcomes: ['决裂', '复仇', '原谅但疏远'],
+    twist_options: ['背叛者有苦衷', '第三方操纵', '背叛是更大计划一部分'],
+    cliché_risk: 7,
+    originality_score: 3,
+  },
+  // ==================== 科幻事件 ====================
+  {
+    id: 'event_scifi_system_hacked',
+    name: '系统被入侵',
+    description: '关键系统被黑客或内鬼入侵，导致连锁反应',
+    genre_tags: ['科幻'],
+    event_type: 'trap',
+    trigger_conditions: ['系统有漏洞', '有人有作案动机'],
+    participants: ['系统用户', '入侵者', '安全负责人'],
+    participant_count: 3,
+    core_conflict: '系统失控，信息泄露',
+    stakes: '安全事故、生命危险、任务失败',
+    information_role: '揭示内部威胁',
+    emotion_curve: ['正常', '异常', '恐慌', '紧急'],
+    intensity: 8,
+    reversibility: 3,
+    dialogue_density: 'low',
+    action_density: 'high',
+    pace_impact: 'fast',
+    common_outcomes: ['系统崩溃', '紧急修复', '追踪入侵者'],
+    twist_options: ['内鬼是安全负责人', '入侵是测试', '入侵者有正当理由'],
+    cliché_risk: 6,
+    originality_score: 4,
+  },
+  {
+    id: 'event_scifi_crew_mutiny',
+    name: '船员叛变',
+    description: '飞船或空间站的船员发生叛乱夺取控制权',
+    genre_tags: ['科幻'],
+    event_type: 'confrontation',
+    trigger_conditions: ['长期压力', '指挥失误', '意识形态分歧'],
+    participants: ['指挥官', '叛变者', '中立船员'],
+    participant_count: 5,
+    core_conflict: '控制权争夺，理念对抗',
+    stakes: '任务成败、人员生死、船舱控制权',
+    information_role: '揭示深层矛盾',
+    emotion_curve: ['紧张', '对立', '冲突', '后果'],
+    intensity: 9,
+    reversibility: 2,
+    dialogue_density: 'high',
+    action_density: 'high',
+    pace_impact: 'fast',
+    common_outcomes: ['叛变成功', '叛变被镇压', '分裂成两派'],
+    twist_options: ['真正的叛变者另有其人', '叛变是为揭露更大阴谋', '外部威胁介入'],
+    cliché_risk: 6,
+    originality_score: 4,
+  },
+  // ==================== 侦探事件 ====================
+  {
+    id: 'event_detective_alibi_broken',
+    name: '不在场证明被推翻',
+    description: '嫌疑人的可靠不在场证明被发现有漏洞',
+    genre_tags: ['侦探', '推理'],
+    event_type: 'revelation',
+    trigger_conditions: ['深入调查', '发现新证人', '技术分析结果出来'],
+    participants: ['侦探', '嫌疑人', '证人'],
+    participant_count: 3,
+    core_conflict: '嫌疑人嫌疑度骤增',
+    stakes: '可能被抓捕、真凶可能逃脱、侦探声誉',
+    information_role: '关键线索串联',
+    emotion_curve: ['确信', '怀疑', '突破'],
+    intensity: 7,
+    reversibility: 4,
+    dialogue_density: 'high',
+    action_density: 'low',
+    pace_impact: 'steady',
+    common_outcomes: ['嫌疑人认罪', '真凶另有其人', '复杂反转'],
+    twist_options: ['证人被收买', '嫌疑人被栽赃', '侦探判断错误'],
+    cliché_risk: 5,
+    originality_score: 5,
+  },
+  {
+    id: 'event_detective_final_confrontation',
+    name: '侦探与真凶最终对峙',
+    description: '侦探找到真凶，在关键时刻进行推理揭露',
+    genre_tags: ['侦探', '推理'],
+    event_type: 'confrontation',
+    trigger_conditions: ['证据链完整', '真凶试图逃跑或毁灭证据'],
+    participants: ['侦探', '真凶', '可能的证人'],
+    participant_count: 3,
+    core_conflict: '真相与谎言的最后交锋',
+    stakes: '正义伸张、真凶命运、侦探安全',
+    information_role: '完整揭示',
+    emotion_curve: ['紧张', '揭露', '对抗', '结局'],
+    intensity: 9,
+    reversibility: 1,
+    dialogue_density: 'high',
+    action_density: 'medium',
+    pace_impact: 'fast',
+    common_outcomes: ['真凶认罪', '真凶反抗', '意外第三因素介入'],
+    twist_options: ['侦探推理有误', '真凶自杀', '真凶使用最后手段'],
+    cliché_risk: 7,
+    originality_score: 3,
+  },
+];
+
+// Scene-Event Patterns - 场景-事件组合模板种子数据
+const sceneEventPatterns: SceneEventPattern[] = [
+  {
+    id: 'pattern_dock_secret_note',
+    name: '码头夜雾递笺',
+    description: '江湖码头夜雾场景与旧识递笺事件的经典组合',
+    scene_id: 'scene_wuxia_dock_night',
+    event_id: 'event_wuxia_secret_note',
+    fit_score: 9.2,
+    why_it_works: '开放空间适合偶遇与潜伏，漂泊感强化宿命，半公开环境适合"明面平静、暗中窥伺"',
+    typical_usage: ['主角初登场', '旧案重开', '引出敌方监视'],
+    tone_variants: ['冷峻', '宿命', '惊险', '哀伤'],
+    cliché_risk: 6,
+    subversion_options: ['送信者并非旧识之仆', '残笺内容被掉包', '真正危险来自围观人群'],
+    upgrade_methods: ['加入环境互动', '延迟揭露信内容', '让危险在最后一拍落下'],
+    example_outline: '主角在码头等待货物，夜雾渐起。一个衣着普通的人靠近递上信件，主角正要打开，雾中传来异响，递信者已消失在人群中...',
+    effectiveness_score: 8.5,
+    originality_score: 6,
+  },
+  {
+    id: 'pattern_hospital_witness',
+    name: '医院走廊的秘密观察',
+    description: '医院走廊场景与证人证词反转事件的组合',
+    scene_id: 'scene_suspense_hospital_corridor',
+    event_id: 'event_suspense_witness_testimony',
+    fit_score: 8.5,
+    why_it_works: '医院是生死的交界，有天然的紧张感。等候区的短暂对话容易被忽略，但信息量极大',
+    typical_usage: ['引入关键证人', '揭示不在场证明漏洞', '制造信息不对称'],
+    tone_variants: ['压抑', '焦虑', '时间压力'],
+    cliché_risk: 4,
+    subversion_options: ['证人身份被误解', '对话被其他事打断', '有人在远处观察'],
+    upgrade_methods: ['加入医疗术语增加专业感', '用仪器声制造节奏', '让证人说出关键但隐晦的话'],
+    example_outline: '主角在手术室外等候，旁边的女人不断看手机，神情焦虑。她无意间说出"那晚明明在家的"...主角注意到了这句话的分量。',
+    effectiveness_score: 8,
+    originality_score: 7,
+  },
+  {
+    id: 'pattern_train_compartment_revelation',
+    name: '列车包厢的隔离审讯',
+    description: '列车包厢密闭场景与不在场证明被推翻事件的组合',
+    scene_id: 'scene_suspense_train_compartment',
+    event_id: 'event_detective_alibi_broken',
+    fit_score: 9.0,
+    why_it_works: '密闭空间强制对话，无法逃脱的设定让双方都必须面对真相，是天然的审讯环境',
+    typical_usage: ['突破嫌疑人心理', '揭露关键矛盾', '最终对决前的铺垫'],
+    tone_variants: ['压迫感', '紧张对峙', '逐渐崩溃'],
+    cliché_risk: 5,
+    subversion_options: ['嫌疑人是清白的', '第三方在偷听', '侦探判断失误的风险'],
+    upgrade_methods: ['用环境细节(如晃动、噪音)制造不安', '让嫌疑人有反击机会', '信息不对称让侦探也陷困境'],
+    example_outline: '列车在隧道中穿行，手机没有信号。侦探面对嫌疑人，指出三个矛盾点。嫌疑人的表情在昏暗灯光下开始崩裂...',
+    effectiveness_score: 8.5,
+    originality_score: 6,
+  },
+  {
+    id: 'pattern_inn_overhear',
+    name: '客栈隔墙有耳',
+    description: '客栈场景与当众身份揭露事件的组合',
+    scene_id: 'scene_wuxia_inn_room',
+    event_id: 'event_wuxia_identity_reveal',
+    fit_score: 8.0,
+    why_it_works: '客栈的隔音差是经典设定，正好适合情报泄露和秘密被偷听',
+    typical_usage: ['泄露秘密推动剧情', '误会产生', '暗中布局'],
+    tone_variants: ['阴谋感', '意外巧合', '紧张等待'],
+    cliché_risk: 8,
+    subversion_options: ['偷听者误解内容', '说话者故意为之', '第三方同时在听'],
+    upgrade_methods: ['让偷听者不得不继续听下去', '加入环境干扰(敲门、走动)', '偷听内容与偷听者本人有关'],
+    example_outline: '主角在雅间休息，隔壁传来低语。"...就是当年血案的关键..."主角屏住呼吸，但脚步声打断了对话。',
+    effectiveness_score: 7,
+    originality_score: 4,
+  },
+  {
+    id: 'pattern_spaceship_mutiny',
+    name: '飞船走廊的叛变夺取',
+    description: '飞船走廊密闭场景与船员叛变事件的科幻组合',
+    scene_id: 'scene_scifi_spaceship_corridor',
+    event_id: 'event_scifi_crew_mutiny',
+    fit_score: 9.5,
+    why_it_works: '密闭飞船环境让叛变更具压迫感，金属走廊的狭窄感强化紧张氛围',
+    typical_usage: ['飞船控制权争夺', '揭示深层阴谋', '生死关头的选择'],
+    tone_variants: ['绝望', '冷峻科幻', '背叛的震惊'],
+    cliché_risk: 5,
+    subversion_options: ['叛变是被诱导的', '真指挥官早已准备', '外部威胁才是真正原因'],
+    upgrade_methods: ['用系统广播增加戏剧效果', '让船员分裂成多派', '技术故障让局势更复杂'],
+    example_outline: '舰长在走廊中被三名船员拦住，武器指着她的后背。"对不起，舰长。这是上面的命令。"舱门在他们身后锁死...',
+    effectiveness_score: 9,
+    originality_score: 6,
+  },
+  {
+    id: 'pattern_subway_night_encounter',
+    name: '深夜地铁的尾随',
+    description: '深夜地铁末班车场景与都市背叛事件的组合',
+    scene_id: 'scene_urban_subway_night',
+    event_id: 'event_urban_betrayal',
+    fit_score: 7.5,
+    why_it_works: '深夜地铁的孤立感和有限出口让被尾随者无处可逃',
+    typical_usage: ['都市不安感', '暴露日常危险', '制造心理压迫'],
+    tone_variants: ['都市孤独', '不安', '无法逃脱的压迫'],
+    cliché_risk: 4,
+    subversion_options: ['尾随者有正当理由', '主角误解', '被尾随的是另一个人'],
+    upgrade_methods: ['用其他乘客制造虚假的安全感', '让尾随者先开口说话', '到站时的紧张时刻'],
+    example_outline: '末班车只有五个人。主角注意到有人在看他。下一站，那人起身走向他的车厢...',
+    effectiveness_score: 7,
+    originality_score: 6,
+  },
+  {
+    id: 'pattern_library_secret_revelation',
+    name: '旧图书馆的发现',
+    description: '旧图书馆场景与关键证物失踪事件的组合',
+    scene_id: 'scene_suspense_old_library',
+    event_id: 'event_suspense_evidence_missing',
+    fit_score: 8.8,
+    why_it_works: '图书馆是知识的海洋，也是秘密的归档处。深夜图书馆有天然的禁忌感和探索欲',
+    typical_usage: ['发现历史线索', '证据被藏或被毁', '引入学术背景案件'],
+    tone_variants: ['神秘', '学术', '时间跨度大'],
+    cliché_risk: 4,
+    subversion_options: ['图书管理员知道更多', '书中的秘密比想象更深', '图书馆本身是关键'],
+    upgrade_methods: ['用书目索引制造搜索过程', '加入老旧档案的物理细节', '让发现与主角个人相关'],
+    example_outline: '在禁区的旧档案中，主角找到了一本所有人以为已焚毁的账册。正要打开，灯光闪烁，有人关掉了主开关...',
+    effectiveness_score: 8,
+    originality_score: 7,
+  },
+  {
+    id: 'pattern_detective_office_client',
+    name: '事务所的神秘委托人',
+    description: '侦探事务所场景与尸体发现事件的经典侦探组合',
+    scene_id: 'scene_detective_office',
+    event_id: 'event_suspense_body_discovered',
+    fit_score: 8.2,
+    why_it_works: '侦探事务所是经典开场场景，神秘委托人的出现自然地引入案件',
+    typical_usage: ['案件引入', '侦探人设展示', '设置后续悬念'],
+    tone_variants: ['颓废', '冷硬', '悬疑'],
+    cliché_risk: 7,
+    subversion_options: ['委托人自己就是嫌疑人', '案件比表面复杂', '委托人有隐藏目的'],
+    upgrade_methods: ['用事务所的环境细节展示侦探性格', '让委托人举止反常', '案件与侦探过去有关'],
+    example_outline: '雨夜，门被推开。一个看不清脸的女人放下一个信封。"我需要你查一个人的底细。"她留下一个名字和一笔费用，没等回应就消失在雨中。信封里是一张陌生人的照片和一句话："他在跟踪我。"',
+    effectiveness_score: 8,
+    originality_score: 5,
+  },
+];
 
 // Auto-initialize on module load
 initializeReferenceLibraries();

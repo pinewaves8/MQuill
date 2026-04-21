@@ -30,6 +30,8 @@ export function OutlineView({ project, onSelectChapter, onRefreshChapters }: Out
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [generatingChapterIds, setGeneratingChapterIds] = useState<Set<string>>(new Set());
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [expandedVolumes, setExpandedVolumes] = useState<Set<string>>(new Set());
   const [editingVolumeId, setEditingVolumeId] = useState<string | null>(null);
   const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
@@ -138,6 +140,159 @@ export function OutlineView({ project, onSelectChapter, onRefreshChapters }: Out
       console.error('Failed to import chapters:', error);
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleGenerateChapterContent = async (chapter: ChapterOutlineType, volumeId: string) => {
+    if (!outline) return;
+
+    setGeneratingChapterIds(prev => new Set(prev).add(chapter.id));
+
+    try {
+      // Step 1: Ensure chapter exists in database (call from-outline which creates if not exists)
+      const chapterRes = await fetch(`/api/projects/${project.id}/chapters/from-outline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volumes: outline.volumes }),
+      });
+
+      if (!chapterRes.ok) {
+        throw new Error('Failed to create/import chapter');
+      }
+
+      // Find the created chapter by title
+      const chapterData = await chapterRes.json();
+      const createdChapters = chapterData.data?.createdChapters || [];
+      let matchedChapter = createdChapters.find((c: { title: string }) => c.title === chapter.title || c.title.startsWith(chapter.title + '：') || c.title.startsWith(chapter.title + ':'));
+
+      if (!matchedChapter) {
+        // Chapter might already exist, try to find it
+        const existingChaptersRes = await fetch(`/api/projects/${project.id}/chapters`);
+        if (existingChaptersRes.ok) {
+          const existingData = await existingChaptersRes.json();
+          const existing = (existingData.data || []).find((c: { title: string }) => c.title === chapter.title || c.title.startsWith(chapter.title + '：') || c.title.startsWith(chapter.title + ':'));
+          if (existing) {
+            matchedChapter = existing;
+          }
+        }
+      }
+
+      if (!matchedChapter) {
+        throw new Error('Chapter not found after creation');
+      }
+
+      // Step 2: Generate scenes from outline
+      const scenesRes = await fetch(`/api/projects/${project.id}/scenes/from-outline`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chapterId: matchedChapter.id }),
+      });
+
+      if (!scenesRes.ok) {
+        throw new Error('Failed to generate scenes');
+      }
+
+      const scenesData = await scenesRes.json();
+      const scenes = scenesData.data?.scenes || [];
+
+      // Step 3: Generate draft for each scene
+      for (const scene of scenes) {
+        await fetch(`/api/scenes/${scene.id}/generate-draft`, {
+          method: 'POST',
+        });
+      }
+
+      alert(`成功为"${chapter.title}"生成 ${scenes.length} 个场景及其正文`);
+      onRefreshChapters();
+    } catch (error) {
+      console.error('Failed to generate chapter content:', error);
+      alert('生成失败，请重试');
+    } finally {
+      setGeneratingChapterIds(prev => {
+        const next = new Set(prev);
+        next.delete(chapter.id);
+        return next;
+      });
+    }
+  };
+
+  const handleGenerateAllChaptersContent = async () => {
+    if (!outline) return;
+
+    setIsGeneratingAll(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      for (const volume of outline.volumes) {
+        for (const chapter of volume.chapters) {
+          try {
+            // Step 1: Ensure chapter exists
+            const chapterRes = await fetch(`/api/projects/${project.id}/chapters/from-outline`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ volumes: outline.volumes }),
+            });
+
+            if (!chapterRes.ok) {
+              failCount++;
+              continue;
+            }
+
+            const chapterData = await chapterRes.json();
+            const createdChapters = chapterData.data?.createdChapters || [];
+            let matchedChapter = createdChapters.find((c: { title: string }) => c.title === chapter.title || c.title.startsWith(chapter.title + '：') || c.title.startsWith(chapter.title + ':'));
+
+            if (!matchedChapter) {
+              const existingChaptersRes = await fetch(`/api/projects/${project.id}/chapters`);
+              if (existingChaptersRes.ok) {
+                const existingData = await existingChaptersRes.json();
+                const existing = (existingData.data || []).find((c: { title: string }) => c.title === chapter.title || c.title.startsWith(chapter.title + '：') || c.title.startsWith(chapter.title + ':'));
+                if (existing) {
+                  matchedChapter = existing;
+                }
+              }
+            }
+
+            if (!matchedChapter) {
+              failCount++;
+              continue;
+            }
+
+            // Step 2: Generate scenes
+            const scenesRes = await fetch(`/api/projects/${project.id}/scenes/from-outline`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ chapterId: matchedChapter.id }),
+            });
+
+            if (!scenesRes.ok) {
+              failCount++;
+              continue;
+            }
+
+            const scenesData = await scenesRes.json();
+            const scenes = scenesData.data?.scenes || [];
+
+            // Step 3: Generate draft for each scene
+            for (const scene of scenes) {
+              await fetch(`/api/scenes/${scene.id}/generate-draft`, {
+                method: 'POST',
+              });
+            }
+
+            successCount++;
+          } catch (err) {
+            console.error(`Failed to generate content for chapter ${chapter.title}:`, err);
+            failCount++;
+          }
+        }
+      }
+
+      alert(`生成完成：成功 ${successCount} 个章节，失败 ${failCount} 个`);
+      onRefreshChapters();
+    } finally {
+      setIsGeneratingAll(false);
     }
   };
 
@@ -378,7 +533,31 @@ export function OutlineView({ project, onSelectChapter, onRefreshChapters }: Out
             {/* Volume/Chapter Outline */}
             {outline && outline.volumes.length > 0 && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-gray-900 text-lg">分卷大纲</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 text-lg">分卷大纲</h3>
+                  <button
+                    onClick={handleGenerateAllChaptersContent}
+                    disabled={isGeneratingAll}
+                    className="px-3 py-1.5 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {isGeneratingAll ? (
+                      <>
+                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        生成中...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        一键生成所有章节内容
+                      </>
+                    )}
+                  </button>
+                </div>
                 {outline.volumes.map((volume, volIndex) => (
                   <div key={volume.id} className="w-full border border-gray-200 rounded-xl overflow-hidden">
                     {/* Volume Header */}
@@ -550,6 +729,23 @@ export function OutlineView({ project, onSelectChapter, onRefreshChapters }: Out
                                       <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                       </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => handleGenerateChapterContent(chapter, volume.id)}
+                                      disabled={generatingChapterIds.has(chapter.id)}
+                                      className="p-1 hover:bg-gray-100 rounded disabled:opacity-50"
+                                      title="生成场景和正文"
+                                    >
+                                      {generatingChapterIds.has(chapter.id) ? (
+                                        <svg className="w-3 h-3 animate-spin text-purple-500" fill="none" viewBox="0 0 24 24">
+                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                        </svg>
+                                      ) : (
+                                        <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                        </svg>
+                                      )}
                                     </button>
                                   </div>
 

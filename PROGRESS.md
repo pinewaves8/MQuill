@@ -120,6 +120,20 @@ cd apps/web && npm run dev
 
 ## 📝 最新进度记录（倒序，最新的在最上面）
 
+- **2026-04-21**：完成 MQuill 场景事件库与生成 Skill 系统
+  - **阶段 1：基础设施**
+    - `skill-interface.ts` - 扩展：新增 `NarrativeFunction`, `EventType`, `SceneTemplate`, `EventTemplate`, `SceneEventPattern`, `SceneEventCard` 接口；新增四个 Skill 的 Input/Output 类型
+    - `reference-library-store.ts` - 扩展：新增四库（scene-library, event-library, scene-event-pattern, scene-event-example）；新增注册/检索方法；添加种子数据（武侠/悬疑/都市/科幻/侦探 各场景+事件+组合模板）
+  - **阶段 2-3：四个新 Skill**
+    - `scene-retrieval-skill.ts` - 场景检索 Skill - 基于标签/语义检索候选场景
+    - `event-retrieval-skill.ts` - 事件检索 Skill - 基于叙事功能/类型检索候选事件
+    - `scene-event-composer-skill.ts` - 场景事件组合 Skill - 生成多候选（保守/戏剧/文学/反套路）并去模板化
+    - `scene-event-polish-skill.ts` - 场景事件打磨 Skill - 套路规避、原创性增强、调性调整、钩子强化
+  - **阶段 4：注册与集成**
+    - `skill-registry.ts` - 注册四个新 Skill，配置 loop_config
+    - `skill-configurator.ts` - 添加新 Skill 的配置（参考库、技法指令、提示）
+  - **Skill 链路**：`scene-retrieval-skill → event-retrieval-skill → scene-event-composer-skill → scene-event-polish-skill`
+
 - **2026-04-19**：完成版本工作台 MVP - 完整实现版本系统升级
   - 提交：`7ab82d9`，18 files changed, 1909 insertions(+), 378 deletions(-)
   - **Phase 0-7 全部完成**：
@@ -318,6 +332,30 @@ cd apps/web && npm run dev
 - `scene-planner-agent` - 场景规划
 - `writer-agent` - 写作生成
 - `critic-agent` - 章节评估
+
+### 已完成的 Skill (7个)
+
+- `bootstrap-skill` - 项目初始化
+- `outline-skill` - 大纲生成
+- `scene-plan-skill` - 场景规划
+- `write-skill` - 写作生成
+- `evaluate-skill` - 质量评估
+- `revision-skill` - 修订
+- `publishability-skill` - 发布评估
+- `scene-retrieval-skill` - 场景检索
+- `event-retrieval-skill` - 事件检索
+- `scene-event-composer-skill` - 场景事件组合
+- `scene-event-polish-skill` - 场景事件打磨
+
+### 已完成的参考库
+
+- `narrative-framework` - 叙事骨架库
+- `visual-lens` - 视觉镜头库
+- `writing-technique` - 笔法技法库
+- `scene-library` - 场景原型库（武侠/悬疑/都市/科幻/侦探）
+- `event-library` - 事件原型库
+- `scene-event-pattern` - 场景-事件组合模板库
+- `scene-event-example` - 场景事件案例库
 
 ### 已完成的检索组件
 
