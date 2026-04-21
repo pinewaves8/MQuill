@@ -135,7 +135,7 @@ interface GenreTechniqueProfile {
 }
 
 // 预定义的类型-技法映射
-export const GENRE_TECHNIQUE_MAP: Record<GenreTag, GenreTechniqueProfile> = {
+export const GENRE_TECHNIQUE_MAP: Partial<Record<GenreTag, GenreTechniqueProfile>> = {
   '玄幻': {
     narrativeFrameworks: ['多线并行', '升级结构', '网状结构'],
     visualLenses: ['动作描写', '升级描写', '法宝展示'],
@@ -252,7 +252,7 @@ const TONE_TECHNIQUE_MAP: Record<ToneTag, string[]> = {
 // SubGenre-to-Technique Mapping
 // ============================================================
 
-const SUBGENRE_TECHNIQUE_MAP: Record<SubGenreTag, string[]> = {
+const SUBGENRE_TECHNIQUE_MAP: Partial<Record<SubGenreTag, string[]>> = {
   '废柴逆袭': ['欲扬先抑', '紧张舒缓交替'],
   '系统流': ['紧张舒缓交替'],  // 系统提示+剧情高潮交替
   '升级流': ['紧张舒缓交替', '层层递进'],
@@ -338,7 +338,7 @@ export class NovelAnalyzer {
     const genres: GenreTag[] = [];
 
     // 题材关键词映射
-    const genreKeywords: Record<GenreTag, string[]> = {
+    const genreKeywords: Partial<Record<GenreTag, string[]>> = {
       '玄幻': ['玄幻', '异世', '异界', '斗气', '魔法', '领主', '巫师'],
       '都市': ['都市', '现代', '职场', '商战', '种田', '乡村', '明星'],
       '武侠': ['武侠', '江湖', '武林', '剑客', '刀客', '侠客'],
@@ -381,7 +381,7 @@ export class NovelAnalyzer {
     const text = `${title} ${description} ${tags.join(' ')}`.toLowerCase();
     const subGenres: SubGenreTag[] = [];
 
-    const subGenreKeywords: Record<SubGenreTag, string[]> = {
+    const subGenreKeywords: Partial<Record<SubGenreTag, string[]>> = {
       '废柴逆袭': ['废柴', '废物', '逆袭', '崛起', '被打压', '受辱'],
       '系统流': ['系统', '面板', '任务', '积分', '商城'],
       '升级流': ['升级', '突破', '修炼', '境界'],
@@ -437,7 +437,7 @@ export class NovelAnalyzer {
       }
     }
 
-    return [...new Set(themes)].slice(0, 5); // 去重，最多5个
+    return Array.from(new Set(themes)).slice(0, 5); // 去重，最多5个
   }
 
   /**
@@ -447,7 +447,7 @@ export class NovelAnalyzer {
     const text = `${title} ${description} ${tags.join(' ')}`.toLowerCase();
     const tones: ToneTag[] = [];
 
-    const toneKeywords: Record<ToneTag, string[]> = {
+    const toneKeywords: Partial<Record<ToneTag, string[]>> = {
       '热血': ['热血', '燃', '激情', '战斗'],
       '虐心': ['虐心', '虐文', '虐', '玻璃渣'],
       '搞笑': ['搞笑', '幽默', '轻松', '沙雕', '逗比'],
@@ -532,17 +532,16 @@ export class NovelAnalyzer {
    * Extract pacing preference
    */
   private extractPacingPreference(subGenres: SubGenreTag[], tones: ToneTag[]): PacingPreference {
-    // 系统流、快穿、无限流通常快节奏
-    if (['系统流', '快穿', '无限流'].some(s => subGenres.includes(s))) {
+    const fastPacedSubGenres: SubGenreTag[] = ['系统流', '快穿', '无限流'];
+    if (fastPacedSubGenres.some((subGenre) => subGenres.includes(subGenre))) {
       return '快节奏';
     }
 
-    // 都市重生、凡人流可能慢热
-    if (['都市重生', '凡人流'].some(s => subGenres.includes(s))) {
+    const slowBurnSubGenres: SubGenreTag[] = ['都市重生', '凡人流'];
+    if (slowBurnSubGenres.some((subGenre) => subGenres.includes(subGenre))) {
       return '慢热';
     }
 
-    // 热血基调适合张弛有度
     if (tones.includes('热血') || tones.includes('燃向')) {
       return '张弛有度';
     }

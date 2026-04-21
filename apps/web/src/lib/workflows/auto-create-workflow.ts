@@ -1,5 +1,7 @@
 import { Project, TargetLength } from '@packages/shared-types';
 
+import type { WorkflowExecutor } from '@/lib/workflows/workflow-executor';
+
 export type AutoCreateStepName =
   | 'charter'
   | 'outline'
@@ -14,6 +16,7 @@ interface WorkflowRequestOptions {
   targetChapters: number;
   runEvaluation: boolean;
   runRevisions: boolean;
+  executor?: WorkflowExecutor;
   onStepStart?: (step: AutoCreateStepName, message?: string) => void;
   onStepProgress?: (step: AutoCreateStepName, progress: number, message?: string) => void;
   onStepComplete?: (step: AutoCreateStepName, message?: string) => void;
@@ -116,6 +119,7 @@ export async function runAutoCreateWorkflow({
   targetChapters,
   runEvaluation,
   runRevisions,
+  executor,
   onStepStart,
   onStepProgress,
   onStepComplete,
@@ -142,14 +146,20 @@ export async function runAutoCreateWorkflow({
   };
 
   onStepStart?.('charter', '正在生成 Charter');
-  await requestJson(apiBase, `/agents/bootstrap/${project.id}`, { method: 'POST' });
+  if (executor) {
+    await executor.bootstrap(project);
+  } else {
+    await requestJson(apiBase, `/agents/bootstrap/${project.id}`, { method: 'POST' });
+  }
   onStepComplete?.('charter', 'Charter 已生成');
 
   onStepStart?.('outline', '正在生成大纲');
-  const outlinePayload = await requestJson<{ outline: OutlineLike }>(apiBase, '/agents/outline', {
-    method: 'POST',
-    body: JSON.stringify({ projectId: project.id }),
-  });
+  const outlinePayload = executor
+    ? { outline: await executor.outline(project) }
+    : await requestJson<{ outline: OutlineLike }>(apiBase, '/agents/outline', {
+        method: 'POST',
+        body: JSON.stringify({ projectId: project.id }),
+      });
   const selectedVolumes = selectOutlineVolumes(outlinePayload.outline, targetChapters);
   result.results.importedChapterTitles = selectedVolumes.flatMap((volume) =>
     volume.chapters.map((chapter) => chapter.title)
@@ -207,14 +217,16 @@ export async function runAutoCreateWorkflow({
       `开始生成《${chapter.title}》的场景与正文`
     );
 
-    const scenesPayload = await requestJson<{ scenes: SceneLike[] }>(
-      apiBase,
-      `/projects/${project.id}/scenes/from-outline`,
-      {
-        method: 'POST',
-        body: JSON.stringify({ chapterId: chapter.id }),
-      }
-    );
+    const scenesPayload = executor
+      ? await executor.generateScenes(apiBase, project, chapter)
+      : await requestJson<{ scenes: SceneLike[] }>(
+          apiBase,
+          `/projects/${project.id}/scenes/from-outline`,
+          {
+            method: 'POST',
+            body: JSON.stringify({ chapterId: chapter.id }),
+          }
+        );
 
     const scenes = scenesPayload.scenes;
     if (scenes.length === 0) {
@@ -233,11 +245,13 @@ export async function runAutoCreateWorkflow({
 
     for (let sceneIndex = 0; sceneIndex < scenes.length; sceneIndex += 1) {
       const scene = scenes[sceneIndex];
-      const draftPayload = await requestJson<{ segment: { content: string } }>(
-        apiBase,
-        `/scenes/${scene.id}/generate-draft`,
-        { method: 'POST' }
-      );
+      const draftPayload = executor
+        ? await executor.generateDraft(apiBase, project, chapter, scene)
+        : await requestJson<{ segment: { content: string } }>(
+            apiBase,
+            `/scenes/${scene.id}/generate-draft`,
+            { method: 'POST' }
+          );
       const wordCount = countWords(draftPayload.segment.content);
       chapterReport.draftSegments += 1;
       chapterReport.draftWordCount += wordCount;
@@ -292,11 +306,13 @@ export async function runAutoCreateWorkflow({
     for (let chapterIndex = 0; chapterIndex < importedChapters.length; chapterIndex += 1) {
       const chapter = importedChapters[chapterIndex];
       onChapterProgress?.(`正在评估第 ${chapterIndex + 1}/${importedChapters.length} 章：${chapter.title}`);
-      const evaluationPayload = await requestJson<{
-        evaluationResult?: { scores?: { total?: number } };
-      }>(apiBase, `/agents/evaluate/${chapter.id}`, {
-        method: 'POST',
-      });
+      const evaluationPayload = executor
+        ? await executor.evaluateChapter(apiBase, chapter)
+        : await requestJson<{
+            evaluationResult?: { scores?: { total?: number } };
+          }>(apiBase, `/agents/evaluate/${chapter.id}`, {
+            method: 'POST',
+          });
 
       const report = result.results.chapterReports[chapterIndex];
       if (report) {
@@ -319,7 +335,16 @@ export async function runAutoCreateWorkflow({
       onChapterProgress?.(`正在修订第 ${chapterIndex + 1}/${importedChapters.length} 章：${chapter.title}`);
       const report = result.results.chapterReports[chapterIndex];
       if (report) {
-        await processIssuesForChapter(apiBase, chapter, report, result);
+        if (executor) {
+          const revisionResult = await executor.reviseChapter(apiBase, chapter);
+          report.issueCount = revisionResult.issueCount;
+          report.revisedIssues = revisionResult.revisedIssues;
+          report.failedIssues = revisionResult.failedIssues;
+          result.results.totalIssues += revisionResult.issueCount;
+          result.results.totalRevisedIssues += revisionResult.revisedIssues.length;
+        } else {
+          await processIssuesForChapter(apiBase, chapter, report, result);
+        }
         const finalDraftPayload = await getDraft(apiBase, chapter.id);
         report.finalWordCount = finalDraftPayload.totalWordCount;
       }

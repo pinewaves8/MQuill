@@ -741,7 +741,7 @@ export class TechniqueRecommender {
    * Get genre technique profile
    */
   private getGenreTechniqueProfile(genre: GenreTag) {
-    return GENRE_TECHNIQUE_MAP[genre];
+    return GENRE_TECHNIQUE_MAP[genre] ?? GENRE_TECHNIQUE_MAP['其他'];
   }
 
   /**

@@ -149,7 +149,7 @@ export class SkillConfigurator {
           ex => ex.category === 'narrative-framework'
         ),
         additionalSystemHints: recommendation.systemHints,
-        weights: recommendation.recommendation ? {} : {},
+        weights: {},
       },
       'scene-plan-skill': {
         enabled: true,

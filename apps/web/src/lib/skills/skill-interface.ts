@@ -29,6 +29,7 @@ export interface TechniqueDirective {
   technique_id: string;
   technique_name: string;
   application_hint: string;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 // ============================================================
