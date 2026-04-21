@@ -48,7 +48,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
     bookType: 'novel',
     targetLength: 'mid',
     language: 'zh',
-    mode: 'co_create',
+    mode: 'auto', // 默认全自动 AI 创作（Skill 智能模式）
     tags: [],
     description: '',
     coverTone: 'amber',
@@ -58,6 +58,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
   const [error, setError] = useState<string | null>(null);
   const [showAutoGen, setShowAutoGen] = useState(false);
   const [createdProject, setCreatedProject] = useState<Project | null>(null);
+  const [useSkillBased, setUseSkillBased] = useState(true); // 默认 Skill 智能创作
 
   if (!isOpen) return null;
 
@@ -292,11 +293,36 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
               {/* AI Mode Hint */}
               {formData.mode === 'auto' && (
                 <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
-                  <div className="flex items-center gap-2 text-xs text-amber-700">
+                  <div className="flex items-center gap-2 text-xs text-amber-700 mb-3">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    全自动模式下，创建后 AI 将立即开始生成完整内容
+                    选择创作模式，创建后 AI 将立即开始生成
+                  </div>
+                  {/* 创作模式切换 */}
+                  <div className="flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUseSkillBased(true)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        useSkillBased
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      Skill 智能创作
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseSkillBased(false)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        !useSkillBased
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                      }`}
+                    >
+                      基准测试(HTTP API)
+                    </button>
                   </div>
                 </div>
               )}
@@ -333,6 +359,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
         setFormData((prev) => ({ ...prev, mode: 'co_create' }));
       }}
       onComplete={handleAutoGenComplete}
+      useSkillBased={useSkillBased}
     />
     </>
   );

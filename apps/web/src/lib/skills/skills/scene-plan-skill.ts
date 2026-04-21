@@ -12,7 +12,7 @@ import type {
   SkillOutputSchema,
   ReferenceExample,
 } from '../skill-interface';
-import { buildGroundingPack } from '@/lib/retrieval/grounding-pack';
+import { buildGroundingPack, type GroundingPack } from '@/lib/retrieval/grounding-pack';
 import { chapterStore } from '@/lib/db/projects-store';
 import { retrieveReferenceExamples } from '../reference-library-store';
 import type { BookOutline } from '@packages/shared-types';
@@ -26,17 +26,11 @@ export async function executeScenePlanSkill(
   input: ScenePlanSkillInput,
   referenceExamples?: ReferenceExample[]
 ): Promise<SkillOutputSchema> {
-  const { projectId, chapterId, chapterTitle, chapterGoal } = input;
+  const { projectId, chapterId, chapterTitle, chapterGoal, reference_examples: inputExamples } = input;
 
   try {
     // Build grounding context
-    const groundingPack = await buildGroundingPack(projectId, {
-      includeLore: true,
-      includeNarrative: true,
-      includeStyle: true,
-      includeMemory: true,
-      includeConstraints: true,
-    });
+    const groundingPack = await buildGroundingPack(projectId);
 
     // Get chapter info
     const chapter = await chapterStore.getById(chapterId);
@@ -45,7 +39,7 @@ export async function executeScenePlanSkill(
     const outlineChapter = volume?.chapters.find((c) => c.title === chapterTitle);
 
     // Retrieve reference examples from visual-lens library
-    const examples = referenceExamples ?? retrieveReferenceExamples({
+    const examples = referenceExamples ?? inputExamples ?? retrieveReferenceExamples({
       libraryId: 'visual-lens',
       mode: 'hybrid',
       maxExamples: 5,
@@ -99,7 +93,7 @@ interface ScenePlanParams {
   chapterTitle: string;
   chapterGoal: string;
   volumeGoal: string;
-  groundingPack: string;
+  groundingPack: GroundingPack;
   referenceExamples: ReferenceExample[];
 }
 
@@ -115,6 +109,7 @@ interface GeneratedScene {
 
 async function generateScenePlan(params: ScenePlanParams): Promise<GeneratedScene[]> {
   const { chapterTitle, chapterGoal, volumeGoal, groundingPack, referenceExamples } = params;
+  const groundingText = JSON.stringify(groundingPack, null, 2);
 
   // Build visual guidance from reference examples
   const visualGuidance = referenceExamples
@@ -132,7 +127,7 @@ async function generateScenePlan(params: ScenePlanParams): Promise<GeneratedScen
 ${visualGuidance || '无参考样本，请运用经典场景描写技法'}
 
 ### 世界观/设定背景
-${groundingPack}
+${groundingText}
 
 请为此章节生成 3-5 个场景规划，每个场景包含：标题、摘要、视角人物、目标、冲突、预期结果。`;
 
@@ -194,7 +189,8 @@ function parseScenePlanResponse(response: string): GeneratedScene[] {
     if (!block.trim()) continue;
 
     const titleMatch = block.match(/标题[：:]\s*(.+)/) || block.match(/^【?(.+?)】?\s*$/);
-    const summaryMatch = block.match(/摘要[：:]\s*(.+)/s) || block.match(/内容[：:]\s*(.+)/s);
+    const summaryMatch =
+      block.match(/摘要[：:]\s*([\s\S]+)/) || block.match(/内容[：:]\s*([\s\S]+)/);
     const viewpointMatch = block.match(/视角[人物]*[：:]\s*(.+)/);
     const goalMatch = block.match(/目标[：:]\s*(.+)/);
     const conflictMatch = block.match(/冲突[：:]\s*(.+)/);

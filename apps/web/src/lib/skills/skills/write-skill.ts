@@ -1,10 +1,8 @@
 /**
- * Write Skill - Chapter content generation with technique directives
+ * Write Skill - Chapter content generation with technique directives.
  *
- * Wraps writer-agent with:
- * - Reference example injection from writing-technique library
- * - Technique directive application
- * - Continuity context from previous segments
+ * Skill files should only generate artifacts. Persistence is handled by the
+ * unified workflow layer.
  */
 
 import type {
@@ -14,16 +12,13 @@ import type {
   ReferenceExample,
   TechniqueDirective,
 } from '../skill-interface';
+import type { SceneCard } from '@packages/shared-types';
 import { writerAgent } from '@/lib/agents/writer-agent';
 import { buildGroundingPack } from '@/lib/retrieval/grounding-pack';
-import { projectStore, chapterStore } from '@/lib/db/projects-store';
+import { projectStore, chapterStore, sceneStore } from '@/lib/db/projects-store';
 import { loadCollection } from '@/lib/db/file-storage';
-import { retrieveReferenceExamples, RetrievalOptions } from '../reference-library-store';
+import { retrieveReferenceExamples } from '../reference-library-store';
 import type { BookOutline } from '@packages/shared-types';
-
-// ============================================================
-// Skill Implementation
-// ============================================================
 
 export async function executeWriteSkill(
   input: WriteSkillInput,
@@ -39,49 +34,59 @@ export async function executeWriteSkill(
     chapterGoal,
     previousContext,
     recentEvents,
+    reference_examples: inputExamples,
+    technique_directives: inputDirectives,
   } = input;
 
   try {
-    // Build grounding context
-    const groundingPack = await buildGroundingPack(projectId, {
-      includeLore: true,
-      includeNarrative: true,
-      includeStyle: true,
-      includeMemory: true,
-      includeConstraints: true,
-      includeTimeline: true,
-    });
+    const groundingPack = await buildGroundingPack(projectId);
 
-    // Get chapter context
-    const chapter = await chapterStore.getById(chapterId);
-    const project = await projectStore.getById(projectId);
-    const outline = loadCollection<BookOutline>('outlines').find((o) => o.projectId === projectId);
+    await chapterStore.getById(chapterId);
+    await projectStore.getById(projectId);
+    const storedScene = await sceneStore.getById(sceneId);
+    const outline = loadCollection<BookOutline>('outlines').find((item) => item.projectId === projectId);
 
-    // Get scene count for context
-    const allChapters = outline?.volumes.flatMap((v) => v.chapters) ?? [];
-    const sceneIndex = allChapters.findIndex((c) => c.id === chapterId) + 1;
+    const allChapters = outline?.volumes.flatMap((volume) => volume.chapters) ?? [];
+    const sceneIndex = allChapters.findIndex((chapter) => chapter.id === chapterId) + 1;
     const sceneCount = allChapters.length;
 
-    // Retrieve reference examples if not provided
-    const examples = referenceExamples ?? retrieveReferenceExamples({
-      libraryId: 'writing-technique',
-      mode: 'hybrid',
-      maxExamples: 5,
-    });
+    const resolvedExamples =
+      referenceExamples ??
+      inputExamples ??
+      retrieveReferenceExamples({
+        libraryId: 'writing-technique',
+        mode: 'hybrid',
+        maxExamples: 5,
+      });
 
-    // Build technique directive string for prompt
-    const techniqueDirectivesStr = techniqueDirectives && techniqueDirectives.length > 0
-      ? techniqueDirectives
-          .map((d) => `- ${d.technique_name}: ${d.application_hint}`)
-          .join('\n')
-      : '';
+    const resolvedDirectives = techniqueDirectives ?? inputDirectives;
+    const techniqueDirectivesStr =
+      resolvedDirectives && resolvedDirectives.length > 0
+        ? resolvedDirectives.map((item) => `- ${item.technique_name}: ${item.application_hint}`).join('\n')
+        : '';
 
-    // Call writer agent with enhanced context
+    const resolvedScene: SceneCard =
+      storedScene ??
+      ({
+        id: scene.id,
+        projectId,
+        chapterId,
+        sortOrder: 0,
+        title: scene.title,
+        summary: scene.summary,
+        goal: scene.goal,
+        conflict: scene.conflict,
+        expectedOutcome: scene.expectedOutcome,
+        source: 'skill-generated',
+        status: 'confirmed',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as SceneCard);
+
     const writerOutput = await writerAgent({
       projectId,
       chapterId,
-      sceneId,
-      scene,
+      scene: resolvedScene,
       context: {
         chapterTitle,
         chapterGoal,
@@ -90,16 +95,19 @@ export async function executeWriteSkill(
         groundingPack,
         sceneIndex,
         sceneCount,
-        // Enhanced fields for technique directives
-        referenceExamples: examples,
+        referenceExamples: resolvedExamples,
         techniqueDirectives: techniqueDirectivesStr,
-        writingGuidelines: buildWritingGuidelines(examples, techniqueDirectives),
+        writingGuidelines: buildWritingGuidelines(resolvedExamples, resolvedDirectives),
       },
     });
 
-    // Map writer output to skill output
     const output: WriteSkillOutput = {
-      status: writerOutput.status === 'completed' ? 'completed' : writerOutput.status === 'failed' ? 'failed' : 'needs_revision',
+      status:
+        writerOutput.status === 'completed'
+          ? 'completed'
+          : writerOutput.status === 'failed'
+            ? 'failed'
+            : 'needs_revision',
       deliverable: {
         content: writerOutput.segment?.content ?? '',
         summary: writerOutput.summary ?? '',
@@ -120,17 +128,12 @@ export async function executeWriteSkill(
   }
 }
 
-// ============================================================
-// Helper Functions
-// ============================================================
-
 function buildWritingGuidelines(
   examples: ReferenceExample[],
   directives?: TechniqueDirective[]
 ): string {
   const guidelines: string[] = [];
 
-  // Add technique directives
   if (directives && directives.length > 0) {
     guidelines.push('## 技法要求');
     for (const directive of directives) {
@@ -139,9 +142,8 @@ function buildWritingGuidelines(
     guidelines.push('');
   }
 
-  // Add reference examples for few-shot learning
   if (examples.length > 0) {
-    guidelines.push('## 参考样本 (Few-Shot)');
+    guidelines.push('## 参考样本');
     for (const example of examples.slice(0, 3)) {
       guidelines.push(`### ${example.title}`);
       if (example.source_work) {
@@ -158,10 +160,6 @@ function buildWritingGuidelines(
 
   return guidelines.join('\n');
 }
-
-// ============================================================
-// Skill Interface Export
-// ============================================================
 
 export const writeSkillId = 'write-skill';
 
