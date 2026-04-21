@@ -7,6 +7,7 @@ import {
   revisionStore,
   versionStore,
 } from '@/lib/db/projects-store';
+import { checkNewContentDuplicates, validateContentDuplicates } from '@/lib/validation/content-validator';
 
 interface RouteParams {
   params: Promise<{ candidateId: string }>;
@@ -104,6 +105,34 @@ export async function POST(
       linkedIssueIds: revision.linkedIssueId ? [revision.linkedIssueId] : [],
       parentId: currentVersion?.id,
     });
+
+    // P0: Gate - Check for duplicate paragraphs before applying revision
+    const pendingContent = mode === 'append'
+      ? `${currentContent}\n\n${candidate.candidateText}`
+      : mode === 'replace'
+        ? currentContent.replace(candidate.originalText || '', candidate.candidateText)
+        : candidate.candidateText;
+
+    const newDuplicates = checkNewContentDuplicates(currentContent, candidate.candidateText);
+    if (newDuplicates.length > 0) {
+      const paragraphs = currentContent.split(/\n\n+/).filter(p => p.trim().length > 0);
+      const duplicateRatio = newDuplicates.length / Math.max(paragraphs.length, 1);
+
+      if (duplicateRatio > 0.05) {
+        return NextResponse.json({
+          error: 'Duplicate paragraph gate blocked',
+          data: {
+            type: 'duplicate_paragraph',
+            duplicateCount: newDuplicates.length,
+            duplicateRatio,
+            samples: newDuplicates.slice(0, 3).map(d => ({
+              existingParagraph: d.index1,
+              sample: d.sample,
+            })),
+          },
+        }, { status: 422 });
+      }
+    }
 
     if (revision.targetScope === 'chapter' && mode === 'replace') {
       for (const segment of segments) {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { issueStore, revisionStore, chapterStore } from '@/lib/db/projects-store';
+import { issueStore, revisionStore } from '@/lib/db/projects-store';
 
 interface RouteParams {
   params: Promise<{ issueId: string }>;
@@ -24,22 +24,29 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const { suggestion, goals, constraints } = body;
 
-    // Create revision linked to this issue
     const revision = await revisionStore.create({
       projectId: issue.projectId,
       chapterId: issue.chapterId,
       targetScope: issue.locationRef ? 'segment' : 'chapter',
       targetRefId: issue.locationRef,
+      originalText: issue.excerpt,
       suggestion: suggestion || issue.suggestion || `修复问题: ${issue.title}`,
       goals: goals || [],
       constraints: constraints || [],
       applyMode: 'replace',
       status: 'draft',
       linkedIssueId: issue.id,
+      issueContext: {
+        excerpt: issue.excerpt,
+        reason: issue.reason,
+        suggestion: issue.suggestion,
+        tags: issue.tags,
+        severity: issue.severity,
+        paragraphIndex: issue.paragraphIndex,
+      },
       createdBy: 'agent',
     });
 
-    // Update issue status to in_revision
     await issueStore.update(issueId, { status: 'in_revision' });
 
     return NextResponse.json({

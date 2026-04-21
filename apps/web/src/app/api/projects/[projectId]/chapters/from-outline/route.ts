@@ -14,11 +14,22 @@ export async function POST(
   try {
     const { projectId } = await params;
     const body = await request.json();
-    const { volumes } = body as { volumes: VolumeOutline[] };
+    const { volumes, replaceExisting } = body as {
+      volumes: VolumeOutline[];
+      replaceExisting?: boolean;
+    };
 
     const project = await projectStore.getById(projectId);
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+    }
+
+    // If replaceExisting is true, delete all existing chapters first
+    if (replaceExisting) {
+      const existingChapters = await chapterStore.getByProject(projectId);
+      for (const chapter of existingChapters) {
+        await chapterStore.delete(chapter.id);
+      }
     }
 
     // Get existing chapters to check what already exists
@@ -29,7 +40,7 @@ export async function POST(
 
     for (const volume of volumes) {
       for (const chapterOutline of volume.chapters) {
-        // Skip if chapter with same title already exists
+        // Skip if chapter with same title already exists (and not replacing)
         if (existingTitles.has(chapterOutline.title)) {
           continue;
         }
