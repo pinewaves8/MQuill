@@ -51,7 +51,7 @@ export async function bootstrapAgent(input: BootstrapInput): Promise<BootstrapOu
 
   const response = await callLLM(messages, {
     temperature: 0.7,
-    maxTokens: 8192,
+    maxTokens: 16384,
   });
 
   const result = parseJSONResponse<BootstrapOutput>(response);

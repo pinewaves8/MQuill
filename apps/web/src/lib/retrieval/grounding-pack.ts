@@ -1,4 +1,4 @@
-import { Memory, NarrativeEvent, CharacterInfo, LocationInfo } from '@packages/shared-types';
+import { Memory, NarrativeEvent, CharacterInfo, LocationInfo, CharacterRelation, TimelineMarker } from '@packages/shared-types';
 import { memoryStore } from '@/lib/db/projects-store';
 
 /**
@@ -15,6 +15,8 @@ export interface GroundingPack {
   style: StyleContext;      // Writing style guidelines
   memory: Memory[];         // Raw memory entries (high priority first)
   constraints: string[];   // Explicit constraints from charter
+  timeline: TimelineMarker[];  // Timeline markers for narrative consistency
+  characterRelations: CharacterRelation[];  // Character relationship map
 }
 
 export interface LoreContext {
@@ -100,6 +102,16 @@ export async function buildGroundingPack(projectId: string): Promise<GroundingPa
     .filter((m) => m.content.facts)
     .flatMap((m) => m.content.facts || []);
 
+  // Extract timeline markers
+  const timelineMarkers: TimelineMarker[] = narrativeMemories
+    .filter((m) => m.content.timelineMarkers)
+    .flatMap((m) => m.content.timelineMarkers || []);
+
+  // Extract character relations
+  const characterRelations: CharacterRelation[] = narrativeMemories
+    .filter((m) => m.content.characterRelations)
+    .flatMap((m) => m.content.characterRelations || []);
+
   return {
     projectId,
     facts,
@@ -108,5 +120,7 @@ export async function buildGroundingPack(projectId: string): Promise<GroundingPa
     style,
     memory: memories.filter((m) => m.priority >= 70), // High priority memories
     constraints: [], // Would come from project charter
+    timeline: timelineMarkers,
+    characterRelations,
   };
 }

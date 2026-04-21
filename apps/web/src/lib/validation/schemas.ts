@@ -43,6 +43,20 @@ export const UpdateChapterSchema = z.object({
   summary: z.string().optional(),
   status: z.enum(['planned', 'drafting', 'revising', 'approved', 'done']).optional(),
   sortOrder: z.number().int().optional(),
+  evaluationScores: z.object({
+    overall: z.number(),
+    overallGrade: z.enum(['excellent', 'good', 'fair', 'poor']),
+    percentile: z.number(),
+    dimensions: z.object({
+      readability: z.number(),
+      rhythm: z.number(),
+      characterConsistency: z.number(),
+      plotCompleteness: z.number(),
+      foreshadowRecovery: z.number(),
+      aiSmell: z.number(),
+    }),
+    evaluatedAt: z.string(),
+  }).optional(),
 });
 
 // Scene validation schemas

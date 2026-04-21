@@ -61,16 +61,47 @@ export async function callLLM(
 }
 
 /**
- * Parse JSON from LLM response, with fallback handling
+ * Parse JSON from LLM response, with fallback handling for incomplete responses
  */
 export function parseJSONResponse<T>(content: string): T {
   // Try to extract JSON from markdown code blocks
+  let jsonStr = content;
   const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = jsonMatch ? jsonMatch[1] : content;
+  if (jsonMatch) {
+    jsonStr = jsonMatch[1];
+  }
 
+  // First try: parse complete JSON
   try {
     return JSON.parse(jsonStr.trim());
   } catch {
-    throw new Error(`Failed to parse JSON: ${content.slice(0, 200)}`);
+    // Second try: find longest valid JSON substring
+    const trimmed = jsonStr.trim();
+
+    // Try parsing from the start, finding the last valid position
+    let lastValidIndex = -1;
+    let lastValidJSON = '';
+
+    for (let i = 0; i < trimmed.length; i++) {
+      try {
+        const candidate = trimmed.slice(0, i + 1);
+        JSON.parse(candidate);
+        lastValidIndex = i;
+        lastValidJSON = candidate;
+      } catch {
+        // Continue searching
+      }
+    }
+
+    if (lastValidIndex > 100) {
+      // Found substantial JSON, try to use it
+      try {
+        return JSON.parse(lastValidJSON);
+      } catch {
+        // Fall through to error
+      }
+    }
+
+    throw new Error(`Failed to parse JSON: ${trimmed.slice(0, 300)}`);
   }
 }
