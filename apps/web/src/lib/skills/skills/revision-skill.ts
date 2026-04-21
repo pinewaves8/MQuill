@@ -12,9 +12,7 @@ import type {
   RevisionSkillOutput,
   SkillOutputSchema,
 } from '../skill-interface';
-import { buildGroundingPack } from '@/lib/retrieval/grounding-pack';
-import { revisionStore } from '@/lib/db/projects-store';
-import type { RevisionTask } from '@packages/shared-types';
+import { buildGroundingPack, type GroundingPack } from '@/lib/retrieval/grounding-pack';
 
 // ============================================================
 // Skill Implementation
@@ -25,8 +23,6 @@ export async function executeRevisionSkill(
 ): Promise<SkillOutputSchema> {
   const {
     projectId,
-    chapterId,
-    segmentId,
     originalText,
     suggestion,
     goals = [],
@@ -36,13 +32,7 @@ export async function executeRevisionSkill(
 
   try {
     // Build grounding context
-    const groundingPack = await buildGroundingPack(projectId, {
-      includeLore: true,
-      includeNarrative: true,
-      includeStyle: true,
-      includeMemory: true,
-      includeConstraints: true,
-    });
+    const groundingPack = await buildGroundingPack(projectId);
 
     // Generate revision
     const revisionResult = await generateRevision({
@@ -54,34 +44,8 @@ export async function executeRevisionSkill(
       groundingPack,
     });
 
-    // If segmentId provided, update the segment
-    if (segmentId) {
-      const revision = await revisionStore.create({
-        projectId,
-        chapterId,
-        targetScope: 'segment',
-        targetRefId: segmentId,
-        originalText,
-        suggestion,
-        goals,
-        constraints,
-        applyMode,
-        createdBy: 'skill',
-        status: 'draft',
-      });
-
-      return {
-        status: revisionResult.applied ? 'completed' : 'needs_revision',
-        deliverable: {
-          revisedContent: revisionResult.content,
-          applied: revisionResult.applied,
-          changeSummary: revisionResult.summary,
-        },
-      };
-    }
-
     return {
-      status: 'completed',
+      status: revisionResult.applied ? 'completed' : 'needs_revision',
       deliverable: {
         revisedContent: revisionResult.content,
         applied: revisionResult.applied,
@@ -108,7 +72,7 @@ interface RevisionParams {
   goals: string[];
   constraints: string[];
   applyMode: 'replace' | 'merge' | 'insert';
-  groundingPack: string;
+  groundingPack: GroundingPack;
 }
 
 interface RevisionResult {
@@ -119,6 +83,7 @@ interface RevisionResult {
 
 async function generateRevision(params: RevisionParams): Promise<RevisionResult> {
   const { originalText, suggestion, goals, constraints, applyMode, groundingPack } = params;
+  const groundingText = JSON.stringify(groundingPack, null, 2);
 
   const userPrompt = `## 任务：应用文本修订
 
@@ -135,7 +100,7 @@ ${goals.length > 0 ? goals.map((g) => `- ${g}`).join('\n') : '无特定目标'}
 ${constraints.length > 0 ? constraints.map((c) => `- ${c}`).join('\n') : '无特定约束'}
 
 ### 世界观/设定背景
-${groundingPack}
+${groundingText}
 
 ### 修订模式
 ${applyMode === 'replace' ? '替换：用新内容完全替换原文' : applyMode === 'merge' ? '合并：将修订内容与原文合并' : '插入：在原文适当位置插入新内容'}

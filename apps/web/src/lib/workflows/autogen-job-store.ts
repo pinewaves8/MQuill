@@ -2,7 +2,8 @@ import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
-import { AutoCreateWorkflowResult, AutoCreateStepName } from '@/lib/workflows/auto-create-workflow';
+import { AutoCreateStepName } from '@/lib/workflows/auto-create-workflow';
+import { UnifiedAutoCreateWorkflowResult } from '@/lib/workflows/unified-auto-create-workflow';
 
 export type AutoGenStepStatus = 'waiting' | 'running' | 'completed' | 'error';
 export type AutoGenJobStatus = 'queued' | 'running' | 'completed' | 'error';
@@ -22,7 +23,7 @@ export interface AutoGenJobState {
   steps: Record<AutoCreateStepName, AutoGenStepState>;
   chapterProgress: string | null;
   error: string | null;
-  result?: AutoCreateWorkflowResult;
+  result?: UnifiedAutoCreateWorkflowResult;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -147,7 +148,10 @@ export function updateAutoGenJob(jobId: string, updates: Partial<AutoGenJobState
   return nextJob;
 }
 
-export function completeAutoGenJob(jobId: string, result: AutoCreateWorkflowResult): AutoGenJobState | undefined {
+export function completeAutoGenJob(
+  jobId: string,
+  result: UnifiedAutoCreateWorkflowResult
+): AutoGenJobState | undefined {
   const job = autoGenJobs.get(jobId);
   if (!job) {
     return undefined;

@@ -14,7 +14,7 @@ import type {
   SkillOutputSchema,
   ReferenceExample,
 } from '../skill-interface';
-import { buildGroundingPack } from '@/lib/retrieval/grounding-pack';
+import { buildGroundingPack, type GroundingPack } from '@/lib/retrieval/grounding-pack';
 import { projectStore, chapterStore, draftSegmentStore } from '@/lib/db/projects-store';
 import { retrieveReferenceExamples } from '../reference-library-store';
 
@@ -30,14 +30,7 @@ export async function executePublishabilitySkill(
 
   try {
     // Build grounding context
-    const groundingPack = await buildGroundingPack(projectId, {
-      includeLore: true,
-      includeNarrative: true,
-      includeStyle: true,
-      includeMemory: true,
-      includeConstraints: true,
-      includeTimeline: true,
-    });
+    const groundingPack = await buildGroundingPack(projectId);
 
     // Gather all chapter content
     const chapters = await chapterStore.getByProject(projectId);
@@ -72,7 +65,7 @@ export async function executePublishabilitySkill(
     });
 
     const output: PublishabilitySkillOutput = {
-      status: evaluation.readiness === 'ready' ? 'completed' : 'needs_revision',
+      status: evaluation.readiness_level === 'ready' ? 'completed' : 'needs_revision',
       deliverable: evaluation,
     };
 
@@ -94,7 +87,7 @@ export async function executePublishabilitySkill(
 interface PublishabilityParams {
   title: string;
   manuscript: string;
-  groundingPack: string;
+  groundingPack: GroundingPack;
   referenceExamples: ReferenceExample[];
 }
 
@@ -114,6 +107,7 @@ interface PublishabilityEvaluation {
 
 async function evaluatePublishability(params: PublishabilityParams): Promise<PublishabilityEvaluation> {
   const { title, manuscript, groundingPack, referenceExamples } = params;
+  const groundingText = JSON.stringify(groundingPack, null, 2);
 
   // Build quality reference from examples
   const qualityReference = referenceExamples
@@ -133,7 +127,7 @@ ${manuscript.slice(0, 15000)}${manuscript.length > 15000 ? '\n\n[...省略后续
 ${qualityReference || '无参考样本'}
 
 ### 世界观/设定背景
-${groundingPack}
+${groundingText}
 
 请对全文进行综合发表评估，评估以下五个维度：
 1. 情节连贯性 - 故事是否逻辑清晰、前后呼应

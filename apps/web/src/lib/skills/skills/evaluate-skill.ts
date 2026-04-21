@@ -48,7 +48,7 @@ export async function executeEvaluateSkill(
     const previousSummaries = sortedChapters
       .slice(Math.max(0, chapterIndex - 3), chapterIndex)
       .map((c) => c.summary?.trim())
-      .filter(Boolean);
+      .filter((summary): summary is string => Boolean(summary));
 
     const volume = outline?.volumes.find((v) => v.id === chapter.parentVolumeId);
     const outlineChapter =
@@ -76,6 +76,10 @@ export async function executeEvaluateSkill(
     });
 
     // Map to output schema
+    const normalizedGate = Object.fromEntries(
+      Object.entries(evaluationResult.gate).map(([key, value]) => [key, value])
+    ) as Record<string, { status: 'pass' | 'warn' | 'fail'; reason: string }>;
+
     const output: EvaluateSkillOutput = {
       status: evaluationResult.decision === 'pass' || evaluationResult.decision === 'pass_with_notes'
         ? 'completed'
@@ -84,7 +88,7 @@ export async function executeEvaluateSkill(
           : 'failed',
       deliverable: {
         scores: evaluationResult.scores,
-        gate: evaluationResult.gate,
+        gate: normalizedGate,
         decision: evaluationResult.decision,
         strengths: evaluationResult.strengths,
         majorIssues: evaluationResult.majorIssues,
@@ -119,7 +123,7 @@ function extractSummaryLine(summary: string | undefined, index: number): string 
 }
 
 function collectKeyEvents(
-  outlineChapter?: { mainEvents?: string[]; hook?: string },
+  outlineChapter?: { mainEvents?: string; hook?: string },
   chapterSummary?: string
 ): string[] {
   const candidates = [
