@@ -12,7 +12,20 @@
       "Bash(curl -s http://localhost:3000)",
       "Bash(curl -X POST http://localhost:3003/api/agents/outline -H \"Content-Type: application/json\" -d '{\"projectId\":\"b191ea8e-adae-4440-8e80-e1a6c555aba6\"}')",
       "Bash(node -e ' *)",
-      "Bash(npx tsx *)"
+      "Bash(npx tsx *)",
+      "Bash(curl -s -X DELETE \"http://localhost:3000/api/issues?chapterId=ed66ba0c-1ffe-427d-a968-a74cec12e7d3\")",
+      "Bash(MQUILL_API_BASE=http://localhost:3000/api node apps/web/scripts/test-paragraph-location.mjs)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(curl -s -X POST http://localhost:3000/api/projects/e83d0e60-cdd5-4256-8aa2-889a0260643b/chapters/from-outline -H \"Content-Type: application/json\" -d '{\"volumes\":[]}')",
+      "Bash(curl -s -X POST \"http://localhost:3000/api/agents/autogon/e83d0e60-cdd5-4256-8aa2-889a0260643b\")",
+      "Bash(curl -s -X POST \"http://localhost:3000/api/agents/autogen/e83d0e60-cdd5-4256-8aa2-889a0260643b\" -H \"Content-Type: application/json\" -d '{\"targetChapters\":2}')",
+      "Bash(curl -s -X POST \"http://localhost:3000/api/agents/autogen/test-id\" -H \"Content-Type: application/json\")",
+      "Bash(xargs grep *)",
+      "Bash(curl -s http://localhost:3000/api/projects)",
+      "Bash(curl -v -X POST \"http://localhost:3000/api/agents/autogen/e83d0e60-cdd5-4256-8aa2-889a0260643b\" -H \"Content-Type: application/json\")"
+    ],
+    "additionalDirectories": [
+      "c:\\tao\\MQuill\\apps\\web\\src\\app\\api\\agents\\autogen\\[projectId]"
     ]
   }
 }
