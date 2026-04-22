@@ -211,6 +211,22 @@ export class SkillExecutor {
         const { handleBootstrapSkill } = await import('./skills/bootstrap-skill');
         return handleBootstrapSkill(input as import('./skill-interface').BootstrapSkillInput);
       }
+      case 'scene-retrieval-skill': {
+        const { handleSceneRetrievalSkill } = await import('./skills/scene-retrieval-skill');
+        return handleSceneRetrievalSkill(input as import('./skill-interface').SceneRetrievalSkillInput);
+      }
+      case 'event-retrieval-skill': {
+        const { handleEventRetrievalSkill } = await import('./skills/event-retrieval-skill');
+        return handleEventRetrievalSkill(input as import('./skill-interface').EventRetrievalSkillInput);
+      }
+      case 'scene-event-composer-skill': {
+        const { handleSceneEventComposerSkill } = await import('./skills/scene-event-composer-skill');
+        return handleSceneEventComposerSkill(input as import('./skill-interface').SceneEventComposerSkillInput);
+      }
+      case 'scene-event-polish-skill': {
+        const { handleSceneEventPolishSkill } = await import('./skills/scene-event-polish-skill');
+        return handleSceneEventPolishSkill(input as import('./skill-interface').SceneEventPolishSkillInput);
+      }
       default:
         throw new Error(`Unknown skill handler for: ${skill.skill_id}`);
     }

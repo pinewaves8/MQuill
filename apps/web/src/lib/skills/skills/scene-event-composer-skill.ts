@@ -177,6 +177,7 @@ function generateCandidates(params: CandidateGenerationParams): SceneEventCard[]
     scenes,
     events,
     patterns,
+    chapterGoal,
     sceneGoal,
     requiredFunctions,
     intensityTarget,
@@ -184,48 +185,80 @@ function generateCandidates(params: CandidateGenerationParams): SceneEventCard[]
 
   const candidates: SceneEventCard[] = [];
 
-  // Strategy 1: Conservative - Use pattern-based combination
-  if (patterns.length > 0) {
-    const patternBased = generatePatternBasedCandidate(params, patterns[0]);
-    if (patternBased) {
-      candidates.push(patternBased);
-    }
-  }
+  // Determine number of scenes based on intensity and chapter complexity
+  const numScenes = Math.min(Math.max(2, Math.ceil(intensityTarget / 3)), 4);
 
-  // Strategy 2: Dramatic - High intensity scene-event combo
-  const dramaticScene = scenes.find((s) => s.danger_level >= 7) || scenes[0];
-  const dramaticEvent = events.find((e) => e.intensity >= 7) || events[0];
-  if (dramaticScene && dramaticEvent) {
-    candidates.push(generateSceneEventCard({
-      ...params,
-      scene: dramaticScene,
-      event: dramaticEvent,
-      variant: 'dramatic',
-    }));
-  }
+  // Match narrative functions to scenes: each scene fulfills 1-2 functions
+  const functionsPerScene = Math.ceil(requiredFunctions.length / numScenes);
 
-  // Strategy 3: Literary - Atmosphere-focused
-  const literaryScene = scenes.find((s) => s.mood_tags.includes('压抑') || s.mood_tags.includes('神秘')) || scenes[0];
-  const literaryEvent = events.find((e) => e.dialogue_density === 'high') || events[0];
-  if (literaryScene && literaryEvent) {
-    candidates.push(generateSceneEventCard({
-      ...params,
-      scene: literaryScene,
-      event: literaryEvent,
-      variant: 'literary',
-    }));
-  }
+  // Sort scenes by their narrative function support
+  const sortedScenes = [...scenes].sort((a, b) => {
+    const aScore = countFunctionSupport(a, requiredFunctions);
+    const bScore = countFunctionSupport(b, requiredFunctions);
+    return bScore - aScore;
+  });
 
-  // Strategy 4: Anti-cliché - Unexpected combination
-  if (scenes.length > 1 && events.length > 1) {
-    const antiClichéScene = scenes[Math.floor(Math.random() * scenes.length)];
-    const antiClichéEvent = events[Math.floor(Math.random() * events.length)];
-    if (antiClichéScene.id !== dramaticScene?.id || antiClichéEvent.id !== dramaticEvent?.id) {
+  // Sort events by intensity and type match
+  const sortedEvents = [...events].sort((a, b) => {
+    // Prefer events that match required functions
+    const aMatch = a.event_type && requiredFunctions.some(fn => eventSupportsFunction(a, fn));
+    const bMatch = b.event_type && requiredFunctions.some(fn => eventSupportsFunction(b, fn));
+    if (aMatch && !bMatch) return -1;
+    if (!aMatch && bMatch) return 1;
+    // Then sort by intensity
+    return b.intensity - a.intensity;
+  });
+
+  // Generate scene sequence: each scene has 1 primary + 1 secondary event
+  for (let i = 0; i < numScenes && i < sortedScenes.length; i++) {
+    const scene = sortedScenes[i];
+    const sceneFunctions = requiredFunctions.slice(i * functionsPerScene, (i + 1) * functionsPerScene);
+
+    // Find matching events for this scene
+    const matchingEvents = sortedEvents.filter(e =>
+      !candidates.some(c => c.id.includes(e.id)) && // Not already used
+      (e.intensity >= (i + 1) * 2) // Escalating intensity
+    );
+
+    const primaryEvent = matchingEvents[0] || sortedEvents[0];
+    const secondaryEvent = matchingEvents[1] || matchingEvents[0] || sortedEvents[0];
+
+    // Determine style based on scene characteristics and position
+    const variant = determineVariantForScene(scene, i, numScenes, intensityTarget);
+
+    // Scene 1: Establish/Introduce
+    if (i === 0) {
       candidates.push(generateSceneEventCard({
         ...params,
-        scene: antiClichéScene,
-        event: antiClichéEvent,
-        variant: 'anti-cliché',
+        scene,
+        event: primaryEvent,
+        variant,
+        sceneIndex: i + 1,
+        sceneFunctions,
+      }));
+    }
+    // Scene 2+: Development and climax
+    else if (i === numScenes - 1 && numScenes > 1) {
+      // Last scene: use highest intensity, dramatic variant
+      const climaxScene = sortedScenes.find(s => s.danger_level >= 7) || scene;
+      const climaxEvent = sortedEvents.find(e => e.intensity >= 8) || primaryEvent;
+      candidates.push(generateSceneEventCard({
+        ...params,
+        scene: climaxScene,
+        event: climaxEvent,
+        variant: 'dramatic',
+        sceneIndex: i + 1,
+        sceneFunctions,
+      }));
+    } else {
+      // Middle scenes: alternate between literary and anti-cliché for variety
+      candidates.push(generateSceneEventCard({
+        ...params,
+        scene,
+        event: primaryEvent,
+        variant: i % 2 === 0 ? 'literary' : 'anti-cliché',
+        sceneIndex: i + 1,
+        sceneFunctions,
       }));
     }
   }
@@ -237,48 +270,85 @@ function generateCandidates(params: CandidateGenerationParams): SceneEventCard[]
       scene: scenes[0],
       event: events[0],
       variant: 'conservative',
+      sceneIndex: 1,
+      sceneFunctions: requiredFunctions.slice(0, 1),
     }));
   }
 
-  return candidates.slice(0, params.candidateCount);
+  return candidates;
 }
 
-function generatePatternBasedCandidate(
-  params: CandidateGenerationParams,
-  pattern: SceneEventPattern
-): SceneEventCard | null {
-  const { scenes, events } = params;
+function countFunctionSupport(scene: SceneTemplate, functions: NarrativeFunction[]): number {
+  // Count how many narrative functions this scene template supports
+  const sceneFunctions = extractSceneFunctions(scene);
+  return functions.filter(fn => sceneFunctions.includes(fn)).length;
+}
 
-  const matchedScene = scenes.find((s) => s.id === pattern.scene_id);
-  const matchedEvent = events.find((e) => e.id === pattern.event_id);
-
-  if (!matchedScene || !matchedEvent) {
-    return null;
+function extractSceneFunctions(scene: SceneTemplate): NarrativeFunction[] {
+  // Infer narrative functions from scene template characteristics
+  const functions: NarrativeFunction[] = [];
+  if (scene.location_type?.includes('室内') || scene.era_tags?.some(e => e.includes('古代'))) {
+    functions.push('establish_setting');
   }
+  if (scene.mood_tags?.includes('紧张') || scene.mood_tags?.includes('危机')) {
+    functions.push('create_crisis', 'escalate_conflict');
+  }
+  if (scene.danger_level >= 7) {
+    functions.push('build_climax');
+  }
+  if (scene.cliché_risk && scene.cliché_risk < 4) {
+    functions.push('create_reversal');
+  }
+  return functions;
+}
 
-  return generateSceneEventCard({
-    ...params,
-    scene: matchedScene,
-    event: matchedEvent,
-    variant: 'conservative',
-  });
+function eventSupportsFunction(event: EventTemplate, fn: NarrativeFunction): boolean {
+  const mapping: Record<string, NarrativeFunction[]> = {
+    encounter: ['introduce_character', 'establish_setting'],
+    revelation: ['reveal_information', 'payoff_foreshadowing'],
+    confrontation: ['escalate_conflict', 'build_climax'],
+    pursuit: ['create_crisis', 'escalate_conflict'],
+    discovery: ['reveal_truth', 'plant_foreshadowing'],
+    betrayal: ['shift_relationship', 'reveal_information'],
+  };
+  return mapping[event.event_type]?.includes(fn) || false;
+}
+
+function determineVariantForScene(
+  scene: SceneTemplate,
+  index: number,
+  total: number,
+  intensity: number
+): 'conservative' | 'dramatic' | 'literary' | 'anti-cliché' {
+  // First scene: conservative (establish)
+  if (index === 0) return 'conservative';
+  // High intensity chapter: dramatic for climactic scenes
+  if (intensity >= 8) return 'dramatic';
+  // Low risk scene: anti-cliché
+  if (scene.cliché_risk && scene.cliché_risk < 4) return 'anti-cliché';
+  // Default: literary for development scenes
+  return 'literary';
 }
 
 interface SceneEventCardParams extends CandidateGenerationParams {
   scene: SceneTemplate;
   event: EventTemplate;
   variant: 'conservative' | 'dramatic' | 'literary' | 'anti-cliché';
+  sceneIndex: number;
+  sceneFunctions: NarrativeFunction[];
 }
 
 function generateSceneEventCard(params: SceneEventCardParams): SceneEventCard {
   const {
     scene,
     event,
+    sceneIndex,
+    sceneFunctions,
     sceneGoal,
-    requiredFunctions,
     characterStates,
     intensityTarget,
     variant,
+    requiredFunctions,
   } = params;
 
   // Generate participating characters from characterStates
@@ -313,9 +383,9 @@ function generateSceneEventCard(params: SceneEventCardParams): SceneEventCard {
   const hook = generateEndingHook(event, variant);
 
   return {
-    id: `sec_${Date.now()}_${variant}`,
-    title: `${scene.name} · ${event.name}`,
-    narrative_function: requiredFunctions.length > 0 ? requiredFunctions : inferNarrativeFunction(event),
+    id: `sec_${sceneIndex}_${variant}_${Date.now()}`,
+    title: `第${sceneIndex}幕：${scene.name} · ${event.name}`,
+    narrative_function: sceneFunctions.length > 0 ? sceneFunctions : (requiredFunctions.length > 0 ? requiredFunctions : inferNarrativeFunction(event)),
     location: {
       type: scene.location_type,
       atmosphere: scene.mood_tags.join('、'),

@@ -16,6 +16,7 @@ import { ProjectOverview } from '@/components/project/project-overview';
 import { OutlineView } from '@/components/project/outline-view';
 import { VersionHistoryDrawer } from '@/components/version/version-history-drawer';
 import { VersionWorkbench } from '@/components/version/version-workbench';
+import { SceneEventPage } from '@/components/project/scene-event-page';
 import { useRevisionStore } from '@/lib/state/revision-store';
 
 export default function EditorPage() {
@@ -40,10 +41,10 @@ export default function EditorPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const { isModalOpen, openModal } = useRevisionStore();
   const [isModalHydrated, setIsModalHydrated] = useState(false);
-  const [leftTab, setLeftTab] = useState<'chapters' | 'outline' | 'versions' | 'evaluation'>(
+  const [leftTab, setLeftTab] = useState<'chapters' | 'outline' | 'scene' | 'versions' | 'evaluation'>(
     () => {
       const tab = searchParams.get('tab');
-      if (tab === 'outline' || tab === 'versions' || tab === 'evaluation') {
+      if (tab === 'outline' || tab === 'scene' || tab === 'versions' || tab === 'evaluation') {
         return tab;
       }
       return 'chapters';
@@ -220,6 +221,22 @@ export default function EditorPage() {
                 .then((res) => res.json())
                 .then((payload) => setChapters(payload.data?.chapters || []));
             }}
+          />
+        ) : leftTab === 'scene' ? (
+          <SceneEventPage
+            projectId={projectId}
+            chapters={chapters}
+            currentChapter={currentChapter}
+            onSelectChapter={setCurrentChapter}
+            onGenerateDraft={(chapterId, sceneEventCard) => {
+              // Switch to chapters tab and trigger write skill
+              setLeftTab('chapters');
+              // Dispatch event to trigger write skill with scene event card
+              window.dispatchEvent(new CustomEvent('generate-draft-from-scene', {
+                detail: { chapterId, sceneEventCard }
+              }));
+            }}
+            onBackToChapter={() => setLeftTab('chapters')}
           />
         ) : leftTab === 'versions' && currentChapter ? (
           <VersionWorkbench

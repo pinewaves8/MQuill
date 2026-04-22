@@ -548,6 +548,10 @@ export interface SceneEventComposerSkillInput extends SkillInputSchema {
   must_avoid_elements?: string[];
   word_budget?: number;
   candidate_count?: number;
+  // 大纲信息（可选）
+  mainEvents?: string;
+  characterProgress?: string;
+  hook?: string;
 }
 
 export interface SceneEventComposerSkillOutput extends SkillOutputSchema {
